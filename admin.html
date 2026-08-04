@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#6366f1">
+    <title>ZE-POS Admin</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { background: var(--bg); }
+        .admin-shell { padding: 24px; max-width: 1200px; margin: 0 auto; }
+        .admin-header {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 12px; flex-wrap: wrap; margin-bottom: 20px;
+        }
+        .admin-brand { font-size: 20px; font-weight: 800; }
+        .admin-brand small { font-weight: 500; color: var(--muted); }
+        .admin-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    </style>
+</head>
+<body>
+    <div class="admin-shell">
+        <div class="admin-header">
+            <div class="admin-brand">🛠 ZE-POS <small>Admin Dashboard</small></div>
+            <div class="admin-actions">
+                <span id="adminUser" class="text-muted"></span>
+                <a class="btn btn-outline btn-sm" href="app.html">Open POS</a>
+                <button class="btn btn-outline btn-sm" id="btnAdminLogout">Logout</button>
+            </div>
+        </div>
+
+        <div id="adminStats" class="stats-grid"></div>
+
+        <div class="card" style="margin-top:20px;">
+            <div class="card-header">
+                <h3>Clients & Subscriptions</h3>
+                <button class="btn btn-primary btn-sm" id="btnAdminRefresh">↻ Refresh</button>
+            </div>
+            <div class="card-body" style="padding:0;">
+                <div id="clientList">
+                    <div class="empty-state"><span class="icon">⏳</span><h3>Loading clients…</h3></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-backdrop" id="adminModalBackdrop">
+        <div class="modal" id="adminModalContent"></div>
+    </div>
+
+    <!-- Confirm dialog -->
+    <div class="modal-backdrop confirm-dialog" id="adminConfirmBackdrop">
+        <div class="modal">
+            <div class="modal-body">
+                <span class="confirm-icon">⚠️</span>
+                <h3 id="adminConfirmTitle">Are you sure?</h3>
+                <p class="confirm-text" id="adminConfirmText"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="adminConfirmCancel">Cancel</button>
+                <button class="btn btn-danger" id="adminConfirmOk">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/admin.js"></script>
+</body>
+</html>
