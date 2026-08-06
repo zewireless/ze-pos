@@ -1,7 +1,7 @@
 {
-    "name": "FoodZone POS",
-    "short_name": "FoodZone",
-    "description": "Point of Sale System for FoodZone Restaurant",
+    "name": "ZE-POS",
+    "short_name": "ZE-POS",
+    "description": "Cloud Point of Sale — subscriptions, orders, and payroll",
     "start_url": "index.html",
     "display": "standalone",
     "background_color": "#ffffff",

@@ -2,14 +2,18 @@
  * Service Worker for FoodZone POS
  * Cache-first for static assets, network-first for navigation
  */
-const CACHE_NAME = 'foodzone-pos-v7';
+const CACHE_NAME = 'foodzone-pos-v8';
 const STATIC_ASSETS = [
     './',
     './index.html',
+    './register.html',
+    './admin.html',
     './app.html',
+    './config.js',
     './css/style.css',
     './js/db.js',
     './js/auth.js',
+    './js/supabase-client.js',
     './js/app.js',
     './js/dashboard.js',
     './js/staff.js',
@@ -23,7 +27,9 @@ const STATIC_ASSETS = [
     './js/orders.js',
     './js/reports.js',
     './js/payroll.js',
+    './js/billing.js',
     './js/receipt.js',
+    './js/admin.js',
     './manifest.json',
     './assets/icons/icon-192.png',
     './assets/icons/icon-512.png',
