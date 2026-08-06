@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="FoodZone">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
+    <title>FoodZone POS - Login</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="login-page">
+        <div class="login-container">
+            <div class="login-logo">🍽</div>
+            <h1 class="login-title">Jelly Booba</h1>
+            <p class="login-subtitle">Sign in to your account</p>
+
+            <div id="loginError" class="login-error">
+                Invalid username or password.
+            </div>
+
+            <form class="login-form" id="loginForm">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" placeholder="Enter username" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="Enter password" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn-login">Sign In</button>
+            </form>
+
+            <div class="login-hint">
+                <strong>Demo Accounts:</strong><br>
+                Admin: admin / admin123<br>
+                Cashier: cashier / cashier123
+            </div>
+        </div>
+    </div>
+
+    <script src="js/db.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        // Redirect if already logged in
+        if (Auth.isLoggedIn()) {
+            window.location.href = 'app.html';
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const errorEl = document.getElementById('loginError');
+
+            const user = Auth.login(username, password);
+            if (user) {
+                window.location.href = 'app.html';
+            } else {
+                errorEl.classList.add('show');
+                document.getElementById('password').value = '';
+                document.getElementById('password').focus();
+            }
+        });
+    </script>
+    <script>
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(() => {});
+        }
+    </script>
+</body>
+</html>

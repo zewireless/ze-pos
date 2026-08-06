@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ZE-POS">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
+    <title>ZE-POS</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-brand">
+                <div class="sidebar-brand-icon">🍽</div>
+                <div class="sidebar-brand-text">
+                    ZE
+                    <small>Point of Sale</small>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav" id="sidebarNav">
+                <div class="sidebar-section">Main</div>
+                <a class="sidebar-link active" data-page="dashboard">
+                    <span class="icon">📊</span> Dashboard
+                </a>
+                <a class="sidebar-link" data-page="pos">
+                    <span class="icon">🛒</span> POS Screen
+                </a>
+
+                <div class="sidebar-section admin-only">Management</div>
+                <a class="sidebar-link admin-only" data-page="staff">
+                    <span class="icon">👥</span> Staff
+                </a>
+                <a class="sidebar-link admin-only" data-page="categories">
+                    <span class="icon">📁</span> Categories
+                </a>
+                <a class="sidebar-link admin-only" data-page="menu">
+                    <span class="icon">📋</span> Menu Items
+                </a>
+                <a class="sidebar-link admin-only" data-page="condiments">
+                    <span class="icon">🧀</span> Condiments
+                </a>
+                <a class="sidebar-link admin-only" data-page="tax">
+                    <span class="icon">💰</span> Tax Setup
+                </a>
+                <a class="sidebar-link admin-only" data-page="schedules">
+                    <span class="icon">📅</span> Shift Schedules
+                </a>
+
+                <div class="sidebar-section">Reports</div>
+                <a class="sidebar-link" data-page="orders">
+                    <span class="icon">📑</span> Order History
+                </a>
+                <a class="sidebar-link" data-page="reports">
+                    <span class="icon">📈</span> Sales Reports
+                </a>
+                <a class="sidebar-link" data-page="shifts">
+                    <span class="icon">🕐</span> Shifts
+                </a>
+                <a class="sidebar-link admin-only" data-page="payroll">
+                    <span class="icon">💰</span> Payroll
+                </a>
+
+                <div class="sidebar-section admin-only">System</div>
+                <a class="sidebar-link admin-only" data-page="settings">
+                    <span class="icon">⚙️</span> Settings
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="sidebar-avatar" id="userAvatar">A</div>
+                    <div class="sidebar-user-info">
+                        <div class="sidebar-user-name" id="userName">Admin</div>
+                        <div class="sidebar-user-role" id="userRole">Admin</div>
+                    </div>
+                </div>
+                <button class="btn-logout" id="btnLogout">🚪 Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <button class="btn btn-ghost btn-icon" id="menuToggle" style="display:none;">☰</button>
+                    <h1 class="header-title" id="pageTitle">Dashboard</h1>
+                </div>
+                <div class="header-actions" id="headerActions"></div>
+            </header>
+
+            <div class="content-area" id="contentArea">
+                <!-- Dashboard Module -->
+                <section class="page-module" id="page-dashboard"></section>
+
+                <!-- POS Module -->
+                <section class="page-module" id="page-pos"></section>
+
+                <!-- Staff Module -->
+                <section class="page-module" id="page-staff"></section>
+
+                <!-- Categories Module -->
+                <section class="page-module" id="page-categories"></section>
+
+                <!-- Menu Module -->
+                <section class="page-module" id="page-menu"></section>
+
+                <!-- Condiments Module -->
+                <section class="page-module" id="page-condiments"></section>
+
+                <!-- Tax Module -->
+                <section class="page-module" id="page-tax"></section>
+
+                <!-- Orders Module -->
+                <section class="page-module" id="page-orders"></section>
+
+                <!-- Reports Module -->
+                <section class="page-module" id="page-reports"></section>
+
+                <!-- Shifts Module -->
+                <section class="page-module" id="page-shifts"></section>
+
+                <!-- Shift Schedules Module -->
+                <section class="page-module" id="page-schedules"></section>
+
+                <!-- Payroll Module -->
+                <section class="page-module" id="page-payroll"></section>
+
+                <!-- Settings Module -->
+                <section class="page-module" id="page-settings"></section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal Container -->
+    <div class="modal-backdrop" id="modalBackdrop">
+        <div class="modal" id="modalContent"></div>
+    </div>
+
+    <!-- Confirm Dialog -->
+    <div class="modal-backdrop confirm-dialog" id="confirmBackdrop">
+        <div class="modal">
+            <div class="modal-body">
+                <span class="confirm-icon">⚠️</span>
+                <h3 id="confirmTitle">Are you sure?</h3>
+                <p class="confirm-text" id="confirmText">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="confirmCancel">Cancel</button>
+                <button class="btn btn-danger" id="confirmOk">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Scripts -->
+    <script src="js/db.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/staff.js"></script>
+    <script src="js/categories.js"></script>
+    <script src="js/menu.js"></script>
+    <script src="js/condiments.js"></script>
+    <script src="js/tax.js"></script>
+    <script src="js/schedules.js"></script>
+    <script src="js/shifts.js"></script>
+    <script src="js/pos.js"></script>
+    <script src="js/orders.js"></script>
+    <script src="js/reports.js"></script>
+    <script src="js/payroll.js"></script>
+    <script src="js/receipt.js"></script>
+    <script>
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(() => {});
+        }
+    </script>
+</body>
+</html>
