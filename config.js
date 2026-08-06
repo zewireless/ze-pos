@@ -12,8 +12,8 @@
  */
 window.ZE_CONFIG = {
     // ── Supabase ──────────────────────────────────────────────
-    SUPABASE_URL: 'https://uggseeorngiuvuktylpz.supabase.co',
-    SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVnZ3NlZW9ybmdpdXZ1a3R5bHB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NzQ5NzMsImV4cCI6MjEwMTM1MDk3M30.wjye7RBfAvwjhDg1Az9zjWS1Kg8_PtL40h148j56ibo',
+    SUPABASE_URL: '',
+    SUPABASE_ANON_KEY: '',
 
     // ── Payments ──────────────────────────────────────────────
     // Manual GCash/Maya/bank billing is the default (no gateway needed).
