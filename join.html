@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ZE-POS">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
+    <title>ZE-POS - Join Your Workplace</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="login-page">
+        <div class="login-container">
+            <div class="login-logo">🍽</div>
+            <h1 class="login-title">Join Your Workplace</h1>
+            <p class="login-subtitle">Your manager gave you an invite code — set up your own sign-in here.</p>
+
+            <div id="joinError" class="login-error" style="display:none;">
+                Something went wrong.
+            </div>
+            <div id="joinSuccess" class="login-success" style="display:none;">
+                Account created! Check your email for a confirmation link, then sign in with your invite code.
+            </div>
+
+            <form class="login-form" id="joinForm">
+                <div class="form-group">
+                    <label for="joinEmail">Email</label>
+                    <input type="email" id="joinEmail" placeholder="you@example.com" required autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label for="joinPassword">Password</label>
+                    <input type="password" id="joinPassword" placeholder="At least 6 characters" required minlength="6" autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <label for="joinConfirm">Confirm Password</label>
+                    <input type="password" id="joinConfirm" placeholder="Repeat password" required autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <label for="joinCode">Invite Code</label>
+                    <input type="text" id="joinCode" placeholder="e.g. A1B2C3D4E5" required autocomplete="off" style="text-transform:uppercase;">
+                </div>
+                <button type="submit" class="btn-login" id="joinBtn">Create My Account</button>
+            </form>
+
+            <div class="login-hint">
+                Already have an account? <a href="index.html"><strong>Sign in</strong></a>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        (async function () {
+            Supabase.init();
+
+            // Already signed in? Go straight to the app.
+            const session = await Supabase.getSession();
+            if (session) {
+                window.location.href = 'app.html';
+                return;
+            }
+
+            document.getElementById('joinForm').addEventListener('submit', async function (e) {
+                e.preventDefault();
+                const email = document.getElementById('joinEmail').value.trim();
+                const password = document.getElementById('joinPassword').value;
+                const confirm = document.getElementById('joinConfirm').value;
+                const code = document.getElementById('joinCode').value.trim().toUpperCase();
+                const errorEl = document.getElementById('joinError');
+                const successEl = document.getElementById('joinSuccess');
+                const btn = document.getElementById('joinBtn');
+                errorEl.style.display = 'none';
+                successEl.style.display = 'none';
+
+                if (password !== confirm) {
+                    errorEl.textContent = 'Passwords do not match.';
+                    errorEl.style.display = 'block';
+                    return;
+                }
+                if (!/^[A-Z0-9]{6,}$/.test(code)) {
+                    errorEl.textContent = 'Enter the invite code your manager shared.';
+                    errorEl.style.display = 'block';
+                    return;
+                }
+
+                btn.disabled = true;
+                btn.textContent = 'Creating account…';
+
+                // Stash the code so we can finish joining even if this tab is closed.
+                localStorage.setItem('pending_invite_code', code);
+
+                const { user, error } = await Supabase.signUp({ email, password });
+                if (error) {
+                    localStorage.removeItem('pending_invite_code');
+                    btn.disabled = false;
+                    btn.textContent = 'Create My Account';
+                    errorEl.textContent = error.message || 'Could not create your account.';
+                    errorEl.style.display = 'block';
+                    return;
+                }
+
+                // Email confirmation is off → a session exists → join right away.
+                const newSession = await Supabase.getSession();
+                if (newSession) {
+                    try {
+                        const client = Supabase.getClient();
+                        await client.rpc('mark_join_pending');
+                        const { error: joinErr } = await client.rpc('join_workspace', { p_code: code });
+                        if (joinErr) {
+                            // Account was created but couldn't be linked yet — we'll
+                            // retry automatically on next sign-in (see DB.init).
+                            btn.disabled = false;
+                            btn.textContent = 'Create My Account';
+                            errorEl.textContent = (joinErr.message || 'Could not join the workspace') +
+                                ' Your account was created — sign in and we’ll retry with your invite code.';
+                            errorEl.style.display = 'block';
+                            window.location.href = 'index.html';
+                            return;
+                        }
+                        localStorage.removeItem('pending_invite_code');
+                        await DB.init();
+                        const { profile } = await Supabase.getProfile();
+                        await Auth.setSession(profile);
+                        window.location.href = 'app.html';
+                        return;
+                    } catch (err) {
+                        // Keep the pending code; DB.init retries on next login.
+                        btn.disabled = false;
+                        btn.textContent = 'Create My Account';
+                        errorEl.textContent = (err.message || 'Could not join the workspace') +
+                            ' Your account was created — sign in and we’ll retry with your invite code.';
+                        errorEl.style.display = 'block';
+                        window.location.href = 'index.html';
+                        return;
+                    }
+                }
+
+                // Email confirmation is on — they confirm, then sign in to finish joining.
+                btn.disabled = false;
+                btn.textContent = 'Create My Account';
+                successEl.textContent = 'Account created! Check your email for the confirmation link, then sign in with your invite code to finish joining.';
+                successEl.style.display = 'block';
+            });
+        })();
+    </script>
+</body>
+</html>
