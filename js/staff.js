@@ -45,6 +45,9 @@ const Staff = (() => {
         el.querySelectorAll('[data-action="edit"]').forEach(btn => {
             btn.addEventListener('click', () => openForm(btn.dataset.id));
         });
+        el.querySelectorAll('[data-action="invite"]').forEach(btn => {
+            btn.addEventListener('click', () => generateInvite(btn.dataset.id));
+        });
         el.querySelectorAll('[data-action="toggle"]').forEach(btn => {
             btn.addEventListener('click', () => toggleStaff(btn.dataset.id));
         });
@@ -66,6 +69,7 @@ const Staff = (() => {
                             <th>Role</th>
                             <th>Pay</th>
                             <th>Status</th>
+                            <th>Account</th>
                             <th>Created</th>
                             <th style="text-align:right;">Actions</th>
                         </tr>
@@ -99,6 +103,12 @@ const Staff = (() => {
                                     <span class="badge ${u.enabled !== false ? 'badge-success' : 'badge-danger'}">
                                         ${u.enabled !== false ? 'Active' : 'Disabled'}
                                     </span>
+                                </td>
+                                <td>
+                                    ${u.authUid
+                                        ? '<span class="badge badge-primary">✓ Login linked</span>'
+                                        : `<button class="btn btn-outline btn-sm" data-action="invite" data-id="${u.id}">🔗 Invite</button>`
+                                    }
                                 </td>
                                 <td class="text-muted">${App.formatDate(u.createdAt)}</td>
                                 <td class="text-right">
@@ -147,9 +157,8 @@ const Staff = (() => {
                            ${isEdit ? 'readonly style="background:#f1f5f9;cursor:not-allowed;"' : ''}>
                 </div>
                 <div class="form-group">
-                    <label>${isEdit ? 'New Password (leave blank to keep current)' : 'Password'} ${!isEdit ? '<span class="required">*</span>' : ''}</label>
-                    <input type="password" class="form-control" id="staffPassword"
-                           placeholder="${isEdit ? '••••••••' : 'Enter password'}">
+                    <label>Sign-in account</label>
+                    <p class="form-hint" style="margin:0;">Staff create their own account with an invite code — you never see their password. After saving, click <strong>🔗 Invite</strong> on the staff list to generate their one-time code.</p>
                 </div>
                 <div class="form-group">
                     <label>Role <span class="required">*</span></label>
@@ -199,10 +208,9 @@ const Staff = (() => {
         document.getElementById('staffPayType').addEventListener('change', updatePayVisibility);
         updatePayVisibility();
 
-        document.getElementById('btnSaveStaff').addEventListener('click', () => {
+        document.getElementById('btnSaveStaff').addEventListener('click', async () => {
             const name = document.getElementById('staffName').value.trim();
             const username = document.getElementById('staffUsername').value.trim();
-            const password = document.getElementById('staffPassword').value;
             const role = document.getElementById('staffRole').value;
 
             // Validation
@@ -212,18 +220,6 @@ const Staff = (() => {
             }
             if (!username) {
                 App.toast('Username is required', 'error');
-                return;
-            }
-            if (!isEdit && !password) {
-                App.toast('Password is required', 'error');
-                return;
-            }
-            if (!isEdit && password.length < 4) {
-                App.toast('Password must be at least 4 characters', 'error');
-                return;
-            }
-            if (isEdit && password && password.length < 4) {
-                App.toast('Password must be at least 4 characters', 'error');
                 return;
             }
 
@@ -245,24 +241,19 @@ const Staff = (() => {
             }
 
             if (isEdit) {
-                const updates = { name, role, payType, hourlyRate, fixedSalary };
-                if (password) {
-                    updates.password = password;
-                }
-                DB.update('users', id, updates);
+                DB.update('users', id, { name, role, payType, hourlyRate, fixedSalary });
                 App.toast('Staff updated successfully');
             } else {
                 DB.insert('users', {
                     name,
                     username,
-                    password,
                     role,
                     enabled: true,
                     payType,
                     hourlyRate,
                     fixedSalary,
                 });
-                App.toast('Staff member added successfully');
+                App.toast('Staff member added. Click 🔗 Invite to give them sign-in access.');
             }
 
             App.closeModal();
@@ -270,6 +261,43 @@ const Staff = (() => {
         });
 
         document.getElementById('staffName').focus();
+    }
+
+    async function generateInvite(id) {
+        const user = DB.getById('users', id);
+        if (!user) return;
+
+        const client = Supabase.getClient();
+        const { data: code, error } = await client.rpc('create_workspace_invite', { p_user_id: id });
+        if (error) {
+            App.toast(error.message || 'Could not generate invite', 'error');
+            return;
+        }
+
+        const joinUrl = `${window.location.origin}/join.html`;
+        App.openModal(`
+            <div class="modal-header">
+                <h3>Invite ${App.escapeHtml(user.name)}</h3>
+                <button class="modal-close" onclick="App.closeModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted" style="margin-bottom:16px;">Share this one-time code (valid 7 days). They open the join link, enter their own email + password + this code, and they're in.</p>
+                <div class="invite-code">${App.escapeHtml(code)}</div>
+                <div class="form-group" style="margin-top:16px;">
+                    <label>Join link</label>
+                    <input type="text" class="form-control" readonly value="${App.escapeHtml(joinUrl)}" onclick="this.select()">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="btnCopyInvite">📋 Copy Code</button>
+                <button class="btn btn-outline" onclick="App.closeModal()">Close</button>
+            </div>
+        `);
+
+        document.getElementById('btnCopyInvite').addEventListener('click', () => {
+            if (navigator.clipboard) navigator.clipboard.writeText(code);
+            App.toast('Invite code copied');
+        });
     }
 
     async function toggleStaff(id) {

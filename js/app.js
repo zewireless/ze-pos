@@ -56,10 +56,14 @@ const App = (() => {
     // ── Subscription ───────────────────────────────────────────
     let subscription = null;
 
-    function setSubscription(profile) {
-        subscription = profile
-            ? { status: profile.subscription_status || 'never', periodEnd: profile.current_period_end || null }
-            : null;
+    // Accepts the get_my_billing RPC snapshot ({ status, period_end }) or a
+    // profiles row (subscription_status / current_period_end) as a fallback.
+    function setSubscription(b) {
+        if (!b) { subscription = null; return; }
+        subscription = {
+            status: b.status || b.subscription_status || 'never',
+            periodEnd: b.period_end || b.current_period_end || null,
+        };
     }
 
     function subscriptionActive() {
@@ -228,6 +232,83 @@ const App = (() => {
         });
     }
 
+    // ── Staff Clock-In / Switch User ───────────────────────────
+    function updateUserUI() {
+        const user = Auth.currentUser();
+        if (!user) return;
+        $('#userName').textContent = user.name;
+        $('#userRole').textContent = user.role === 'admin' ? 'Admin' : 'Cashier';
+        $('#userAvatar').textContent = user.name.charAt(0).toUpperCase();
+
+        // "Back to Owner" only makes sense on a shared register (owner session
+        // present). Direct cashier logins have no owner marker — just clock-in.
+        $('#btnSwitchUser').innerHTML = (Auth.isStaffSession() && Auth.hasOwnerSession())
+            ? '🔙 Back to Owner'
+            : '👤 Switch User';
+
+        // Show/hide admin elements
+        $$('.admin-only').forEach(el => el.style.display = Auth.isAdmin() ? '' : 'none');
+        $$('.super-admin-only').forEach(el => el.style.display = Auth.isSuperAdmin() ? '' : 'none');
+    }
+
+    function openSwitchUserModal() {
+        // Shared-register staff session with an owner present → switch back.
+        if (Auth.isStaffSession() && Auth.hasOwnerSession()) {
+            Auth.switchToOwner();
+            updateUserUI();
+            toast(`Signed back in as ${Auth.currentUser().name}`);
+            navigateTo('dashboard');
+            return;
+        }
+
+        App.openModal(`
+            <div class="modal-header">
+                <h3>Staff Clock In</h3>
+                <button class="modal-close" onclick="App.closeModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted" style="margin-bottom:16px;">Enter your staff username and password to clock in at this register. Sales you make will be recorded to your shift.</p>
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" class="form-control" id="staffLoginUsername" placeholder="e.g. juan123" autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" class="form-control" id="staffLoginPassword" placeholder="Enter password" autocomplete="current-password">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="App.closeModal()">Cancel</button>
+                <button class="btn btn-primary" id="btnStaffLogin">Clock In</button>
+            </div>
+        `);
+
+        document.getElementById('btnStaffLogin').addEventListener('click', async () => {
+            const username = document.getElementById('staffLoginUsername').value.trim();
+            const password = document.getElementById('staffLoginPassword').value;
+            if (!username || !password) {
+                toast('Enter your username and password', 'error');
+                return;
+            }
+            const btn = document.getElementById('btnStaffLogin');
+            btn.disabled = true;
+            btn.textContent = 'Checking…';
+            const { user, error } = await Auth.loginAsStaff(username, password);
+            btn.disabled = false;
+            btn.textContent = 'Clock In';
+            if (error || !user) {
+                toast(error.message || 'Invalid username or password', 'error');
+                return;
+            }
+            App.closeModal();
+            updateUserUI();
+            toast(`Signed in as ${user.name}`);
+            navigateTo('pos');
+        });
+
+        document.getElementById('staffLoginUsername').focus();
+    }
+
     // ── Init ───────────────────────────────────────────────────
     async function init() {
         Supabase.init();
@@ -245,24 +326,16 @@ const App = (() => {
 
         const { profile } = await Supabase.getProfile();
         await Auth.setSession(profile);
-        setSubscription(profile);
+
+        // Subscription belongs to the workspace (the owner's profile), so a
+        // cashier must see the business's billing — not their own stub profile.
+        const client = Supabase.getClient();
+        const { data: billing } = client ? await client.rpc('get_my_billing') : { data: null };
+        setSubscription(billing || profile);
 
         if (!Auth.requireAuth()) return;
 
-        const user = Auth.currentUser();
-
-        // Set user info in sidebar
-        $('#userName').textContent = user.name;
-        $('#userRole').textContent = user.role;
-        $('#userAvatar').textContent = user.name.charAt(0).toUpperCase();
-
-        // Show/hide admin elements
-        if (!Auth.isAdmin()) {
-            $$('.admin-only').forEach(el => el.style.display = 'none');
-        }
-        if (!Auth.isSuperAdmin()) {
-            $$('.super-admin-only').forEach(el => el.style.display = 'none');
-        }
+        updateUserUI();
 
         // Sidebar navigation (href links like the Admin Dashboard are external pages)
         $$('.sidebar-link').forEach(link => {
@@ -276,6 +349,9 @@ const App = (() => {
 
         // Logout
         $('#btnLogout').addEventListener('click', () => Auth.logout());
+
+        // Staff clock-in / switch user
+        $('#btnSwitchUser').addEventListener('click', openSwitchUserModal);
 
         // Modal close
         $('#modalBackdrop').addEventListener('click', (e) => {

@@ -22,7 +22,7 @@ const DB = (() => {
 
     // camelCase (app) → snake_case (column). Keys absent here pass through unchanged.
     const FIELD_MAP = {
-        users: { payType: 'pay_type', hourlyRate: 'hourly_rate', fixedSalary: 'fixed_salary', createdAt: 'created_at' },
+        users: { authUid: 'auth_uid', payType: 'pay_type', hourlyRate: 'hourly_rate', fixedSalary: 'fixed_salary', createdAt: 'created_at' },
         categories: { createdAt: 'created_at' },
         menu_items: { categoryId: 'category_id', createdAt: 'created_at' },
         menu_sizes: { menuItemId: 'menu_item_id', createdAt: 'created_at' },
@@ -135,7 +135,26 @@ const DB = (() => {
     async function init() {
         const session = await Supabase.getSession();
         if (!session) throw new Error('Not signed in');
-        workspaceId = session.user.id;
+
+        // If this account is mid-join (email confirmation, or a join that failed),
+        // finish linking it to the workspace before hydrating anything.
+        const pending = localStorage.getItem('pending_invite_code');
+        if (pending) {
+            try {
+                const client = Supabase.getClient();
+                await client.rpc('mark_join_pending');
+                const { error } = await client.rpc('join_workspace', { p_code: pending });
+                if (!error) localStorage.removeItem('pending_invite_code');
+            } catch (err) {
+                console.warn('pending invite retry:', err.message || err);
+            }
+        }
+
+        // The workspace comes from the signed-in account's profile, not from
+        // assuming the account is the workspace owner (cashiers belong to the
+        // owner's workspace via profiles.workspace_id).
+        const { profile } = await Supabase.getProfile();
+        workspaceId = (profile && profile.workspace_id) || session.user.id;
 
         // Ensure starter data exists for this workspace (idempotent)
         const seedErr = await Supabase.seedWorkspace();
