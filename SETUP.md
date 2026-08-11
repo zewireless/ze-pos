@@ -25,11 +25,17 @@ code to **live clients paying a monthly fee** — all on free tiers.
 > Free tier: 500 MB Postgres, 50k monthly logins — plenty for a small client base.
 > You only outgrow it later ($25/mo Pro).
 
-## Step 2 — Run the database migration
+## Step 2 — Run the database migrations
 
 1. Open your project → **SQL Editor** → **New query**.
-2. Paste the entire contents of `supabase/migrations/001_init.sql`.
-3. Run it. You should see "Success" (creates plans, profiles, payments, the 12 tenant tables, RLS, admin RPCs, and the seed function).
+2. Paste the entire contents of `supabase/migrations/001_init.sql`, run it.
+   Creates plans, profiles, payments, the 12 tenant tables, RLS, admin RPCs, and
+   the seed function.
+3. Paste the entire contents of `supabase/migrations/002_cashier_auth.sql`, run
+   it. Adds `profiles.workspace_id` / `users.auth_uid`, membership-based RLS, the
+   invite-code table + RPCs (`create_workspace_invite`, `mark_join_pending`,
+   `join_workspace`), and re-points billing/admin RPCs at the workspace.
+   Safe on an existing database (backfills current owners).
 
 ## Step 3 — Point the app at your Supabase project
 
@@ -70,6 +76,48 @@ BUSINESS_PAYMENT_DETAILS: {
 
 > Since Supabase URL/key are in `config.js`, no server env vars are needed. Keep
 > `config.js` simple — it only holds the public anon key (safe to ship; RLS protects data).
+
+## Cashier / staff login
+
+Each cashier gets their **own Supabase account** and signs in directly at
+`/index.html` — the owner never needs to log in first. Access is granted with a
+one-time **invite code** (no email provider, no edge functions).
+
+How it works:
+
+1. Owner signs in → **Staff → Add Staff** (name, username, role **Cashier** or
+   **Admin**). No password needed — the cashier sets their own.
+2. Owner clicks **🔗 Invite** on that staff row → a one-time code (valid 7 days)
+   and the join link `…/join.html` are shown. Share them with the cashier.
+3. Cashier opens `join.html`, enters **their own email + password + the code**,
+   and their account is created and linked to the business. They sign in at
+   `/index.html` with that email + password.
+4. On sign-in they're in the app as themselves: admin-only pages are hidden, and
+   the POS requires them to **Start Shift** (schedule rules still enforced).
+   Sales they make are recorded to their shift and payroll.
+
+> Legacy staff rows (created before this update) have no login account yet — the
+> owner just clicks **🔗 Invite** on each one. The old shared-register
+> "Switch User / Clock In" still works on a device the owner has signed into.
+>
+> If a staff member already has a ZE-POS account (e.g. they own another
+> business), they can't take a second account — use a different email for their
+> staff account.
+>
+> Invite codes are single-use and expire in 7 days. To revoke one before it's
+> used, delete and re-create the staff member (or ask for support).
+
+### Security model
+
+- Tenant data is isolated by **membership**, not by auth.uid: every account has a
+  `profiles.workspace_id` (the owner's = their own uid; a cashier's = the
+  owner's uid). All RLS policies resolve the workspace from the signed-in user's
+  profile, so a cashier reads their business's data and nothing else.
+- An anonymous signup always starts as its **own** empty workspace — nothing can
+  reassign it except a valid, unused, unexpired invite code.
+- The `users` table (staff roster) is **admin-write-only**; everyone can read it.
+  Other tenant tables are workspace-wide read/write for members (the UI already
+  hides admin pages from cashiers).
 
 ## Step 6 — Test the whole flow
 
@@ -122,7 +170,7 @@ public anon key can never read another client's data.
 
 - **Internet required** for the app (data lives in the cloud). Offline-first is a future phase.
 - **Last-write-wins** sync — two devices editing the same record at once can overwrite each other. Fine for a single counter.
-- **One login per business** for now (cashier-specific logins are a later phase; staff roles still work in-app).
+- **Cashiers sign in with their own account** (invite code links them to the business); the old shared-register switch still works on owner-signed-in devices. See "Cashier / staff login" above.
 - New clients start with a **starter menu**; they edit it in the Menu page.
 
 ## Useful links
