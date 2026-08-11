@@ -2,11 +2,12 @@
  * Service Worker for FoodZone POS
  * Cache-first for static assets, network-first for navigation
  */
-const CACHE_NAME = 'foodzone-pos-v8';
+const CACHE_NAME = 'foodzone-pos-v10';
 const STATIC_ASSETS = [
     './',
     './index.html',
     './register.html',
+    './join.html',
     './admin.html',
     './app.html',
     './config.js',
