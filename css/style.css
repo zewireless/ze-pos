@@ -318,6 +318,22 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
     background: var(--danger);
     color: white;
 }
+.btn-logout.btn-switch:hover {
+    background: var(--primary);
+}
+.invite-code {
+    background: var(--bg);
+    border: 2px dashed var(--primary);
+    border-radius: var(--radius);
+    padding: 18px;
+    font-family: 'Courier New', monospace;
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-align: center;
+    color: var(--primary);
+    user-select: all;
+}
 
 /* ── Main Content ───────────────────────────────────────────── */
 .main-content {
