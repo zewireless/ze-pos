@@ -1,24 +1,6 @@
 -- =============================================================
--- ZE-POS 003 — Server-side trust layer
---
--- Run this in the Supabase SQL Editor AFTER 001_init.sql + 002_cashier_auth.sql.
--- Idempotent + backfill-safe (same pattern as 002). Safe on an existing database.
---
--- What this adds:
---   * SERVER-SIDE PAYWALL — tenant rows can no longer be written (insert/update/
---     delete) when the workspace subscription is not active. Reads stay open so
---     owners can still see historical data while overdue. Super admins exempt.
---   * ROLE-GATED WRITES — catalog / menu / settings / payroll / schedules become
---     admin-write + member-read; orders/order_items become member-insert +
---     admin-update/delete; shifts member-insert + self-update / admin-update.
---     Previously every workspace member could rewrite ANY row (incl. their own
---     pay rate and historical orders).
---   * audit_log table + log_action() RPC — who did what, when.
---   * Removed the owner's hardcoded 'cloud-login' credential; users.password is
---     cleared and no longer readable via the API.
---   * billing_paymongo_record() — service-role-only RPC for the PayMongo webhook
---     (fixes the is_super_admin-under-service-role failure of 002's webhook).
---   * Indexes for the hot query paths.
+-- ZE-POS 003 — Server-side trust layer (paywall + role-gated writes + audit)
+-- Run THIRD in Supabase SQL Editor (after 001_init.sql + 002_cashier_auth.sql)
 -- =============================================================
 
 -- -------------------------------------------------------------
@@ -288,7 +270,7 @@ begin
         (ws, 'st1', 'restaurant_name', coalesce(owner_name, 'My Business')),
         (ws, 'st2', 'restaurant_address', ''),
         (ws, 'st3', 'restaurant_phone', ''),
-        (ws, 'st4', 'currency_symbol', '₱'),
+        (ws, 'st4', 'currency_symbol', '��'),
         (ws, 'st5', 'overtime_enabled', '0'),
         (ws, 'st6', 'overtime_daily_threshold', '8'),
         (ws, 'st7', 'overtime_weekly_threshold', '40'),

@@ -1,6 +1,6 @@
 -- =============================================================
--- ZE-POS multi-tenant subscription schema
--- Run this in the Supabase SQL Editor (project → SQL → New query).
+-- ZE-POS 001 — Base schema (multi-tenant subscription + POS)
+-- Run FIRST in Supabase SQL Editor (after 000_reset.sql on fresh DB)
 -- =============================================================
 
 create extension if not exists "pgcrypto";
@@ -214,7 +214,7 @@ create table if not exists public.settings (
 );
 
 -- -------------------------------------------------------------
--- Row-Level Security
+-- Row-Level Security (auth.uid()-based — will be upgraded in 002)
 -- -------------------------------------------------------------
 
 -- Auto-create a profile row whenever a user signs up
@@ -241,7 +241,7 @@ create trigger on_auth_user_created
     after insert on auth.users
     for each row execute function public.handle_new_user();
 
--- profiles: clients may read ONLY their own row; nothing else
+-- profiles: clients may read ONLY their own row
 alter table public.profiles enable row level security;
 create policy "profiles read own" on public.profiles
     for select using (id = auth.uid());
@@ -254,7 +254,7 @@ create policy "plans read all" on public.plans
 -- payments: only accessible via SECURITY DEFINER admin RPCs / service role
 alter table public.payments enable row level security;
 
--- Tenant tables: strict isolation by workspace
+-- Tenant tables: strict isolation by workspace (auth.uid() = workspace owner)
 do $$
 declare t text;
 begin
@@ -472,7 +472,7 @@ begin
         (ws, 'st1', 'restaurant_name', coalesce(owner_name, 'My Business')),
         (ws, 'st2', 'restaurant_address', ''),
         (ws, 'st3', 'restaurant_phone', ''),
-        (ws, 'st4', 'currency_symbol', '₱'),
+        (ws, 'st4', 'currency_symbol', '��'),
         (ws, 'st5', 'overtime_enabled', '0'),
         (ws, 'st6', 'overtime_daily_threshold', '8'),
         (ws, 'st7', 'overtime_weekly_threshold', '40'),

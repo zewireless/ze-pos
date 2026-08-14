@@ -1,19 +1,6 @@
 -- =============================================================
 -- ZE-POS 002 — Direct cashier logins (invite-code provisioning)
---
--- Run this in the Supabase SQL Editor AFTER 001_init.sql.
--- Safe to run on an existing database (backfills + idempotent).
---
--- What this does:
---   * profiles.workspace_id  — the workspace each account belongs to.
---       Owner:  workspace_id = id (self).
---       Cashier: workspace_id = the owner's id.
---   * users.auth_uid         — links a Supabase account to its staff row.
---   * Tenant RLS re-keyed from `workspace_id = auth.uid()` to
---       `workspace_id = workspace_of()` (membership-based).
---   * Invite-code provisioning: owner generates a one-time code, the
---       cashier signs up on join.html and the account is linked to the
---       workspace. No edge functions / service_role needed.
+-- Run SECOND in Supabase SQL Editor (after 001_init.sql)
 -- =============================================================
 
 -- -------------------------------------------------------------
@@ -22,7 +9,7 @@
 alter table public.profiles add column if not exists workspace_id uuid;
 alter table public.profiles add column if not exists pending_join boolean not null default false;
 
--- Existing owners become self-owned workspaces.
+-- Existing owners become self-owned workspaces
 update public.profiles set workspace_id = id where workspace_id is null;
 
 alter table public.profiles alter column workspace_id set not null;
@@ -72,7 +59,7 @@ update public.users u
 -- 3. Membership helpers
 -- -------------------------------------------------------------
 
--- The workspace the current user belongs to.
+-- The workspace the current user belongs to
 create or replace function public.workspace_of()
 returns uuid
 language sql
@@ -105,7 +92,7 @@ $$;
 -- 4. RLS rework — membership-based tenant isolation
 -- -------------------------------------------------------------
 
--- Drop the old auth.uid()-based policies on all tenant tables.
+-- Drop the old auth.uid()-based policies on all tenant tables
 do $$
 declare t text;
 begin
@@ -117,7 +104,7 @@ begin
     end loop;
 end $$;
 
--- Non-user tenant tables: all members read + write their workspace's rows.
+-- Non-user tenant tables: all members read + write their workspace's rows
 do $$
 declare t text;
 begin
@@ -166,7 +153,7 @@ create policy "invites_admin" on public.workspace_invites
     for all using (workspace_id = public.workspace_of() and public.is_workspace_admin())
     with check (workspace_id = public.workspace_of() and public.is_workspace_admin());
 
--- Owner/admin generates a one-time code for a staff member.
+-- Owner/admin generates a one-time code for a staff member
 create or replace function public.create_workspace_invite(p_user_id text)
 returns text
 language plpgsql
@@ -200,7 +187,7 @@ begin
 end;
 $$;
 
--- Marks the current account as "fresh, waiting to join a workspace".
+-- Marks the current account as "fresh, waiting to join a workspace"
 create or replace function public.mark_join_pending()
 returns void
 language sql
@@ -298,7 +285,7 @@ begin
         (ws, 'st1', 'restaurant_name', coalesce(owner_name, 'My Business')),
         (ws, 'st2', 'restaurant_address', ''),
         (ws, 'st3', 'restaurant_phone', ''),
-        (ws, 'st4', 'currency_symbol', '₱'),
+        (ws, 'st4', 'currency_symbol', '��'),
         (ws, 'st5', 'overtime_enabled', '0'),
         (ws, 'st6', 'overtime_daily_threshold', '8'),
         (ws, 'st7', 'overtime_weekly_threshold', '40'),
