@@ -1,0 +1,10 @@
+# Claude Code session/config files
+.claude/
+
+# OS / editor
+Thumbs.db
+.DS_Store
+*.swp
+
+# Supabase local tooling (if used later)
+supabase/.temp/
