@@ -179,6 +179,23 @@ const DB = (() => {
         init,
         getWorkspaceId,
 
+        // Fire-and-forget audit log entry (migration 003). Never blocks or
+        // throws; failures only go to the console.
+        async logAction(action, entityType = null, entityId = null, details = {}) {
+            try {
+                const client = Supabase.getClient();
+                if (!client) return;
+                await client.rpc('log_action', {
+                    p_action: action,
+                    p_entity_type: entityType,
+                    p_entity_id: entityId,
+                    p_details: details || {},
+                });
+            } catch (err) {
+                console.warn('audit log failed:', err.message || err);
+            }
+        },
+
         getAll(table) {
             return [...getStore(table)];
         },

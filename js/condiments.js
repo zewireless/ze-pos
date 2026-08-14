@@ -116,9 +116,11 @@ const Condiments = (() => {
 
             if (item) {
                 DB.update('condiments', id, { name, price });
+                DB.logAction('condiment_update', 'condiments', id, { name, price });
                 App.toast('Condiment updated');
             } else {
-                DB.insert('condiments', { name, price, enabled: true });
+                const rec = DB.insert('condiments', { name, price, enabled: true });
+                DB.logAction('condiment_add', 'condiments', rec.id, { name, price });
                 App.toast('Condiment added');
             }
 
@@ -133,15 +135,18 @@ const Condiments = (() => {
         const item = DB.getById('condiments', id);
         if (item) {
             DB.update('condiments', id, { enabled: !item.enabled });
+            DB.logAction('condiment_toggle', 'condiments', id, { name: item.name, enabled: !item.enabled });
             App.toast(`Condiment ${item.enabled ? 'disabled' : 'enabled'}`);
             render();
         }
     }
 
     async function deleteItem(id) {
+        const item = DB.getById('condiments', id);
         const yes = await App.confirm('Delete Condiment?', 'This condiment will be removed from all future orders.');
         if (yes) {
             DB.remove('condiments', id);
+            DB.logAction('condiment_delete', 'condiments', id, { name: item ? item.name : null });
             App.toast('Condiment deleted');
             render();
         }

@@ -235,8 +235,8 @@ const Admin = (() => {
                                     <tr>
                                         <td>${fmtDate(p.created_at)}</td>
                                         <td><strong>${p.amount}</strong></td>
-                                        <td class="text-muted">${p.method}</td>
-                                        <td>${p.status === 'paid' ? '<span class="badge badge-success">Paid</span>' : '<span class="badge badge-warning">' + p.status + '</span>'}</td>
+                                        <td class="text-muted">${App_escapeHtml(p.method)}</td>
+                                        <td>${p.status === 'paid' ? '<span class="badge badge-success">Paid</span>' : '<span class="badge badge-warning">' + App_escapeHtml(p.status) + '</span>'}</td>
                                         <td class="text-muted">${App_escapeHtml(p.reference || '—')}</td>
                                     </tr>
                                 `).join('')}

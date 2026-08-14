@@ -127,9 +127,11 @@ const Categories = (() => {
 
             if (cat) {
                 DB.update('categories', id, { name, description });
+                DB.logAction('category_update', 'categories', id, { name, description });
                 App.toast('Category updated successfully');
             } else {
-                DB.insert('categories', { name, description, enabled: true });
+                const rec = DB.insert('categories', { name, description, enabled: true });
+                DB.logAction('category_add', 'categories', rec.id, { name });
                 App.toast('Category created successfully');
             }
 
@@ -144,15 +146,18 @@ const Categories = (() => {
         const cat = DB.getById('categories', id);
         if (cat) {
             DB.update('categories', id, { enabled: !cat.enabled });
+            DB.logAction('category_toggle', 'categories', id, { name: cat.name, enabled: !cat.enabled });
             App.toast(`Category ${cat.enabled ? 'disabled' : 'enabled'}`);
             render();
         }
     }
 
     async function deleteCategory(id) {
+        const cat = DB.getById('categories', id);
         const yes = await App.confirm('Delete Category?', 'This will not delete menu items in this category.');
         if (yes) {
             DB.remove('categories', id);
+            DB.logAction('category_delete', 'categories', id, { name: cat ? cat.name : null });
             App.toast('Category deleted');
             render();
         }

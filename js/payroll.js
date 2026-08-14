@@ -513,7 +513,7 @@ const Payroll = (() => {
             'Save'
         );
         if (yes) {
-            DB.insert('payrolls', {
+            const run = DB.insert('payrolls', {
                 fromDate,
                 toDate,
                 status: 'unpaid',
@@ -522,6 +522,7 @@ const Payroll = (() => {
                 createdAt: new Date().toISOString(),
                 paidAt: null,
             });
+            DB.logAction('payroll_run_save', 'payrolls', run.id, { fromDate, toDate, totalPay: total, cashiers: items.length });
             App.toast('Payroll run saved');
             render();
         }
@@ -535,9 +536,11 @@ const Payroll = (() => {
             const yes = await App.confirm('Mark as Paid?', `Mark the payroll run for ${App.formatDate(run.fromDate)} – ${App.formatDate(run.toDate)} (${App.formatCurrency(run.totalPay)}) as paid?`, 'Mark Paid');
             if (!yes) return;
             DB.update('payrolls', id, { status: 'paid', paidAt: new Date().toISOString() });
+            DB.logAction('payroll_mark_paid', 'payrolls', id, { fromDate: run.fromDate, toDate: run.toDate, totalPay: run.totalPay });
             App.toast('Payroll marked as paid');
         } else {
             DB.update('payrolls', id, { status: 'unpaid', paidAt: null });
+            DB.logAction('payroll_mark_unpaid', 'payrolls', id, { fromDate: run.fromDate, toDate: run.toDate });
             App.toast('Payroll marked as unpaid');
         }
         render();
@@ -555,6 +558,7 @@ const Payroll = (() => {
         if (!yes) return;
         const nowIso = new Date().toISOString();
         unpaid.forEach(r => DB.update('payrolls', r.id, { status: 'paid', paidAt: nowIso }));
+        DB.logAction('payroll_mark_all_paid', 'payrolls', null, { count: unpaid.length, totalPay: total });
         App.toast(`${unpaid.length} payroll run(s) marked as paid`);
         render();
     }
@@ -565,6 +569,7 @@ const Payroll = (() => {
         const yes = await App.confirm('Delete Payroll Run?', `Delete the run for ${App.formatDate(run.fromDate)} – ${App.formatDate(run.toDate)}?`, 'Delete');
         if (yes) {
             DB.remove('payrolls', id);
+            DB.logAction('payroll_run_delete', 'payrolls', id, { fromDate: run.fromDate, toDate: run.toDate, totalPay: run.totalPay });
             App.toast('Payroll run deleted');
             render();
         }

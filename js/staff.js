@@ -242,9 +242,10 @@ const Staff = (() => {
 
             if (isEdit) {
                 DB.update('users', id, { name, role, payType, hourlyRate, fixedSalary });
+                DB.logAction('staff_update', 'users', id, { name, role, payType, hourlyRate, fixedSalary });
                 App.toast('Staff updated successfully');
             } else {
-                DB.insert('users', {
+                const rec = DB.insert('users', {
                     name,
                     username,
                     role,
@@ -253,6 +254,7 @@ const Staff = (() => {
                     hourlyRate,
                     fixedSalary,
                 });
+                DB.logAction('staff_add', 'users', rec.id, { name, username, role, payType });
                 App.toast('Staff member added. Click 🔗 Invite to give them sign-in access.');
             }
 
@@ -273,6 +275,7 @@ const Staff = (() => {
             App.toast(error.message || 'Could not generate invite', 'error');
             return;
         }
+        DB.logAction('staff_invite', 'users', id, { name: user.name });
 
         const joinUrl = `${window.location.origin}/join.html`;
         App.openModal(`
@@ -305,6 +308,7 @@ const Staff = (() => {
         if (user) {
             const newStatus = user.enabled === false ? true : false;
             DB.update('users', id, { enabled: newStatus });
+            DB.logAction('staff_toggle', 'users', id, { name: user.name, enabled: newStatus });
             App.toast(`${user.name} is now ${newStatus ? 'active' : 'disabled'}`);
             render();
         }
@@ -324,6 +328,7 @@ const Staff = (() => {
             DB.getAll('shift_schedules')
                 .filter(s => s.userId === id)
                 .forEach(s => DB.remove('shift_schedules', s.id));
+            DB.logAction('staff_delete', 'users', id, { name: user.name, role: user.role });
             App.toast('Staff member deleted');
             render();
         }

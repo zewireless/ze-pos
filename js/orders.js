@@ -117,6 +117,7 @@ const Orders = (() => {
         DB.getAll('order_items')
             .filter(i => i.orderId === id)
             .forEach(i => DB.remove('order_items', i.id));
+        DB.logAction('order_delete', 'orders', id, { orderNumber: order.orderNumber, total: order.total });
         App.toast('Order deleted');
         render();
     }
@@ -132,6 +133,7 @@ const Orders = (() => {
         if (!yes) return;
         DB.clear('orders');
         DB.clear('order_items');
+        DB.logAction('orders_delete_all', 'orders', null, { count });
         App.toast('All orders deleted');
         render();
     }

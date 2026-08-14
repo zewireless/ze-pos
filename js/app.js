@@ -25,10 +25,29 @@ const App = (() => {
         return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     }
 
+    // HTML-escape for BOTH text-node and attribute contexts. Escaping quotes as
+    // well means any `value="..."` / `title="..."` / data-* interpolation in the
+    // templates is safe against attribute-injection (stored XSS). Harmless in
+    // text nodes (the browser decodes &quot; back to ").
     function escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str || '';
-        return div.innerHTML;
+        return String(str == null ? '' : str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    // Whitelist an image src: only inline image data-URLs and http(s) URLs.
+    // Anything else (javascript:, data:text/html, svg data-URLs) is dropped so a
+    // tampered menu_items.image can't break out of the attribute or load a
+    // script-bearing document.
+    function safeImageUrl(src) {
+        if (!src) return '';
+        const s = String(src);
+        if (/^https?:\/\//i.test(s)) return s;
+        if (/^data:image\/(png|jpe?g|gif|webp|bmp);base64,/i.test(s)) return s;
+        return '';
     }
 
     // ── Toast ──────────────────────────────────────────────────
@@ -207,12 +226,19 @@ const App = (() => {
             DB.setSetting('restaurant_address', $('#settAddress').value.trim());
             DB.setSetting('restaurant_phone', $('#settPhone').value.trim());
             DB.setSetting('currency_symbol', $('#settCurrency').value.trim() || '$');
+            DB.logAction('settings_update', 'settings', null, {
+                restaurant_name: $('#settName').value.trim(),
+                restaurant_address: $('#settAddress').value.trim(),
+                restaurant_phone: $('#settPhone').value.trim(),
+                currency_symbol: $('#settCurrency').value.trim() || '$',
+            });
             toast('Settings saved successfully');
         });
 
         $('#btnResetData').addEventListener('click', async () => {
             const yes = await App.confirm('Reset All Data?', 'This will permanently delete all your data and restore defaults.', 'Reset');
             if (yes) {
+                DB.logAction('settings_reset_all', 'settings', null, {});
                 DB.resetAll();
                 toast('All data has been reset');
                 navigateTo('dashboard');
@@ -222,6 +248,11 @@ const App = (() => {
         $('#btnClearHistory').addEventListener('click', async () => {
             const yes = await App.confirm('Clear Order & Shift History?', 'This will delete all orders, shifts, and payroll runs. Your staff, menu, tax, schedules, and settings will be kept.', 'Clear History');
             if (yes) {
+                DB.logAction('history_clear', null, null, {
+                    orders: DB.count('orders'),
+                    shifts: DB.count('shifts'),
+                    payrolls: DB.count('payrolls'),
+                });
                 DB.clear('orders');
                 DB.clear('order_items');
                 DB.clear('shifts');
@@ -232,7 +263,7 @@ const App = (() => {
         });
     }
 
-    // ── Staff Clock-In / Switch User ───────────────────────────
+    // ── User UI ─────────────────────────────────────────────────
     function updateUserUI() {
         const user = Auth.currentUser();
         if (!user) return;
@@ -240,73 +271,10 @@ const App = (() => {
         $('#userRole').textContent = user.role === 'admin' ? 'Admin' : 'Cashier';
         $('#userAvatar').textContent = user.name.charAt(0).toUpperCase();
 
-        // "Back to Owner" only makes sense on a shared register (owner session
-        // present). Direct cashier logins have no owner marker — just clock-in.
-        $('#btnSwitchUser').innerHTML = (Auth.isStaffSession() && Auth.hasOwnerSession())
-            ? '🔙 Back to Owner'
-            : '👤 Switch User';
-
-        // Show/hide admin elements
+        // Show/hide admin elements. UI-only gating — real enforcement is RLS
+        // (migration 003) keyed to the signed-in account, not this marker.
         $$('.admin-only').forEach(el => el.style.display = Auth.isAdmin() ? '' : 'none');
         $$('.super-admin-only').forEach(el => el.style.display = Auth.isSuperAdmin() ? '' : 'none');
-    }
-
-    function openSwitchUserModal() {
-        // Shared-register staff session with an owner present → switch back.
-        if (Auth.isStaffSession() && Auth.hasOwnerSession()) {
-            Auth.switchToOwner();
-            updateUserUI();
-            toast(`Signed back in as ${Auth.currentUser().name}`);
-            navigateTo('dashboard');
-            return;
-        }
-
-        App.openModal(`
-            <div class="modal-header">
-                <h3>Staff Clock In</h3>
-                <button class="modal-close" onclick="App.closeModal()">✕</button>
-            </div>
-            <div class="modal-body">
-                <p class="text-muted" style="margin-bottom:16px;">Enter your staff username and password to clock in at this register. Sales you make will be recorded to your shift.</p>
-                <div class="form-group">
-                    <label>Username</label>
-                    <input type="text" class="form-control" id="staffLoginUsername" placeholder="e.g. juan123" autocomplete="username">
-                </div>
-                <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" class="form-control" id="staffLoginPassword" placeholder="Enter password" autocomplete="current-password">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-outline" onclick="App.closeModal()">Cancel</button>
-                <button class="btn btn-primary" id="btnStaffLogin">Clock In</button>
-            </div>
-        `);
-
-        document.getElementById('btnStaffLogin').addEventListener('click', async () => {
-            const username = document.getElementById('staffLoginUsername').value.trim();
-            const password = document.getElementById('staffLoginPassword').value;
-            if (!username || !password) {
-                toast('Enter your username and password', 'error');
-                return;
-            }
-            const btn = document.getElementById('btnStaffLogin');
-            btn.disabled = true;
-            btn.textContent = 'Checking…';
-            const { user, error } = await Auth.loginAsStaff(username, password);
-            btn.disabled = false;
-            btn.textContent = 'Clock In';
-            if (error || !user) {
-                toast(error.message || 'Invalid username or password', 'error');
-                return;
-            }
-            App.closeModal();
-            updateUserUI();
-            toast(`Signed in as ${user.name}`);
-            navigateTo('pos');
-        });
-
-        document.getElementById('staffLoginUsername').focus();
     }
 
     // ── Init ───────────────────────────────────────────────────
@@ -349,9 +317,6 @@ const App = (() => {
 
         // Logout
         $('#btnLogout').addEventListener('click', () => Auth.logout());
-
-        // Staff clock-in / switch user
-        $('#btnSwitchUser').addEventListener('click', openSwitchUserModal);
 
         // Modal close
         $('#modalBackdrop').addEventListener('click', (e) => {
@@ -414,7 +379,7 @@ const App = (() => {
             banner.className = 'pwa-install-banner';
             banner.innerHTML = `
                 <div class="pwa-text">
-                    <strong>📲 Install FoodZone POS</strong>
+                    <strong>📲 Install ZE-POS</strong>
                     <small>Add to your home screen for the best experience</small>
                 </div>
                 <button class="btn" id="pwaInstallBtn">Install</button>
@@ -442,7 +407,7 @@ const App = (() => {
 
         window.addEventListener('appinstalled', () => {
             deferredPrompt = null;
-            toast('FoodZone POS has been installed!');
+            toast('ZE-POS has been installed!');
         });
     }
 
@@ -458,6 +423,7 @@ const App = (() => {
         formatDate,
         formatDateTime,
         escapeHtml,
+        safeImageUrl,
         renderSettings,
         $,
         $$,

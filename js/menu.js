@@ -93,8 +93,8 @@ const Menu = (() => {
                                 <tr>
                                     <td>
                                         <div style="width:48px;height:48px;border-radius:8px;background:var(--bg);display:flex;align-items:center;justify-content:center;overflow:hidden;">
-                                            ${item.image
-                                                ? `<img src="${item.image}" style="width:100%;height:100%;object-fit:cover;">`
+                                            ${App.safeImageUrl(item.image)
+                                                ? `<img src="${App.safeImageUrl(item.image)}" style="width:100%;height:100%;object-fit:cover;">`
                                                 : '<span style="font-size:1.5rem;">🍽</span>'
                                             }
                                         </div>
@@ -185,7 +185,7 @@ const Menu = (() => {
         const imgInput = document.getElementById('itemImage');
         const imgUpload = document.getElementById('imageUpload');
         if (item && item.image) {
-            imgUpload.innerHTML = `<img src="${item.image}"><input type="file" accept="image/*" id="itemImage">`;
+            imgUpload.innerHTML = `<img src="${App.safeImageUrl(item.image)}"><input type="file" accept="image/*" id="itemImage">`;
             // Re-bind after innerHTML change
             document.getElementById('itemImage').addEventListener('change', handleImageUpload);
         }
@@ -237,10 +237,12 @@ const Menu = (() => {
                 const oldSizes = DB.query('menu_sizes', s => s.menuItemId === id);
                 oldSizes.forEach(s => DB.remove('menu_sizes', s.id));
                 sizeData.forEach(s => DB.insert('menu_sizes', { menuItemId: id, name: s.name, price: s.price }));
+                DB.logAction('menu_item_update', 'menu_items', id, { name, categoryId, sizes: sizeData });
                 App.toast('Menu item updated');
             } else {
                 const newItem = DB.insert('menu_items', { ...imageData, enabled: true });
                 sizeData.forEach(s => DB.insert('menu_sizes', { menuItemId: newItem.id, name: s.name, price: s.price }));
+                DB.logAction('menu_item_add', 'menu_items', newItem.id, { name, categoryId, sizes: sizeData });
                 App.toast('Menu item created');
             }
 
@@ -292,7 +294,7 @@ const Menu = (() => {
         const reader = new FileReader();
         reader.onload = function (ev) {
             const upload = document.getElementById('imageUpload');
-            upload.innerHTML = `<img src="${ev.target.result}"><input type="file" accept="image/*" id="itemImage">`;
+            upload.innerHTML = `<img src="${App.safeImageUrl(ev.target.result)}"><input type="file" accept="image/*" id="itemImage">`;
             document.getElementById('itemImage').addEventListener('change', handleImageUpload);
         };
         reader.readAsDataURL(file);
@@ -308,11 +310,13 @@ const Menu = (() => {
     }
 
     async function deleteItem(id) {
+        const item = DB.getById('menu_items', id);
         const yes = await App.confirm('Delete Menu Item?', 'This will permanently remove this item and its sizes.');
         if (yes) {
             DB.remove('menu_items', id);
             // Remove associated sizes
             DB.query('menu_sizes', s => s.menuItemId === id).forEach(s => DB.remove('menu_sizes', s.id));
+            DB.logAction('menu_item_delete', 'menu_items', id, { name: item ? item.name : null });
             App.toast('Menu item deleted');
             render();
         }

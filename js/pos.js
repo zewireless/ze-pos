@@ -314,8 +314,8 @@ const POS = (() => {
         return `
             <div class="pos-product-card" data-item-id="${item.id}">
                 <div class="pos-product-img">
-                    ${item.image
-                        ? `<img src="${item.image}" alt="${App.escapeHtml(item.name)}">`
+                    ${App.safeImageUrl(item.image)
+                        ? `<img src="${App.safeImageUrl(item.image)}" alt="${App.escapeHtml(item.name)}">`
                         : '🍽'
                     }
                 </div>
