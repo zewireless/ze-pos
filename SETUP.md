@@ -36,6 +36,28 @@ code to **live clients paying a monthly fee** — all on free tiers.
    invite-code table + RPCs (`create_workspace_invite`, `mark_join_pending`,
    `join_workspace`), and re-points billing/admin RPCs at the workspace.
    Safe on an existing database (backfills current owners).
+4. Paste the entire contents of `supabase/migrations/003_integrity.sql`, run it.
+   The server-side trust layer (also safe on an existing database):
+   - **Paywall enforced in the database** — a workspace with no active
+     subscription can read its data but **cannot** create/edit/delete anything.
+     Super-admin accounts are always exempt.
+   - **Role-gated writes** — menu/categories/condiments/tax/settings/payroll/
+     schedules are admin-write; cashiers can only insert orders and manage their
+     own open shift.
+   - **`audit_log` table + `log_action` RPC** — order deletes, payroll paid,
+     staff changes, price changes, and settings changes are recorded with the
+     acting user and a timestamp.
+   - **No more `cloud-login`** — the owner's seeded password is removed and the
+     `users.password` column is no longer readable by the app.
+   - **`billing_paymongo_record`** — a service-role-only RPC the (fixed) PayMongo
+     webhook uses to activate payments.
+   - **Indexes** for the hot report/query paths.
+
+   > ⚠️ After running 003, any workspace whose subscription is not `active` (or
+   > whose `current_period_end` has passed) is **blocked server-side** from
+   > taking orders. If you were testing on an account you never activated,
+   > activate it from your admin dashboard (admin.html → 💰 Pay) before trying to
+   > sell on it.
 
 ## Step 3 — Point the app at your Supabase project
 
@@ -96,9 +118,13 @@ How it works:
    the POS requires them to **Start Shift** (schedule rules still enforced).
    Sales they make are recorded to their shift and payroll.
 
+> **Every staff member signs in with their own account.** The old shared-register
+> "Switch User / Clock In" was removed in migration 003 — a cashier must be
+> invite-linked and log in at `/index.html` with their own email + password. This
+> is what makes per-user permissions enforceable server-side.
+>
 > Legacy staff rows (created before this update) have no login account yet — the
-> owner just clicks **🔗 Invite** on each one. The old shared-register
-> "Switch User / Clock In" still works on a device the owner has signed into.
+> owner just clicks **🔗 Invite** on each one and shares the code.
 >
 > If a staff member already has a ZE-POS account (e.g. they own another
 > business), they can't take a second account — use a different email for their
@@ -115,9 +141,16 @@ How it works:
   profile, so a cashier reads their business's data and nothing else.
 - An anonymous signup always starts as its **own** empty workspace — nothing can
   reassign it except a valid, unused, unexpired invite code.
-- The `users` table (staff roster) is **admin-write-only**; everyone can read it.
-  Other tenant tables are workspace-wide read/write for members (the UI already
-  hides admin pages from cashiers).
+- The `users` table (staff roster) is **admin-write-only**; members can read it.
+- Since migration 003, writes are **role-gated at the database**: menu/categories/
+  condiments/tax/settings/payroll/schedules are admin-write; cashiers insert
+  orders and manage only their own open shift. The UI hiding is just cosmetic —
+  the database is the real boundary.
+- Since migration 003, the **subscription paywall is enforced at the database**:
+  an inactive workspace cannot write any row (see Step 2). Disabling JS or
+  editing the DOM cannot bypass it.
+- Every sensitive change (order delete, payroll paid, staff edits, price
+  changes, settings, history reset) is written to the `audit_log` table.
 
 ## Step 6 — Test the whole flow
 
@@ -141,6 +174,12 @@ Requires a **PayMongo merchant account** (needs PH business registration + bank 
 3. In PayMongo → **Developers → Webhooks**, add the webhook URL
    `https://<project-ref>.supabase.co/functions/v1/paymongo-webhook`
    and subscribe to the **`checkout_session.payment_paid`** event.
+
+   > The webhook re-fetches each event from PayMongo and reads the profile/amount
+   > from the *verified* payload (never the request body), validates the amount
+   > against the plan, and records the payment idempotently via the
+   > `billing_paymongo_record` RPC (service-role only). It only needs
+   > `PAYMONGO_SECRET_KEY` — `SUPABASE_SERVICE_ROLE_KEY` is injected by Supabase.
 4. In `config.js`: `PAYMONGO_ENABLED: true` and
    `PAYMONGO_CHECKOUT_URL: 'https://<project-ref>.supabase.co/functions/v1/paymongo-checkout'`.
 5. Re-deploy. The billing page now shows **"Pay Online"**.
@@ -162,15 +201,17 @@ admin.html (owner only, is_super_admin) → clients, statuses, payments, cancel/
 PayMongo (gated) → checkout edge fn + webhook edge fn auto-activate after payment
 ```
 
-**Security:** every tenant table has RLS scoped to `workspace_id = auth.uid()`.
-Admin actions go through SECURITY DEFINER RPCs that check `is_super_admin`, so the
-public anon key can never read another client's data.
+**Security:** every tenant table has RLS scoped to `workspace_id = workspace_of()`
+(the signed-in account's workspace — owner or linked cashier). Writes are gated
+on role + active subscription. Admin actions go through SECURITY DEFINER RPCs
+that check `is_super_admin`, so the public anon key can never read another
+client's data or activate a payment.
 
 ## Known limits (MVP)
 
 - **Internet required** for the app (data lives in the cloud). Offline-first is a future phase.
 - **Last-write-wins** sync — two devices editing the same record at once can overwrite each other. Fine for a single counter.
-- **Cashiers sign in with their own account** (invite code links them to the business); the old shared-register switch still works on owner-signed-in devices. See "Cashier / staff login" above.
+- **Cashiers sign in with their own account** (invite code links them to the business). No shared-register clock-in — each device session is the signed-in user's. See "Cashier / staff login" above.
 - New clients start with a **starter menu**; they edit it in the Menu page.
 
 ## Useful links

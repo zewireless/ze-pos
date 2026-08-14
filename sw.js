@@ -1,8 +1,11 @@
 /**
- * Service Worker for FoodZone POS
+ * Service Worker for ZE-POS
  * Cache-first for static assets, network-first for navigation
+ *
+ * BUMP CACHE_NAME on every deploy — assets are served cache-first, so without a
+ * bump clients keep running the previous release.
  */
-const CACHE_NAME = 'foodzone-pos-v10';
+const CACHE_NAME = 'ze-pos-v11';
 const STATIC_ASSETS = [
     './',
     './index.html',
