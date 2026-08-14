@@ -160,12 +160,15 @@ const DB = (() => {
         const seedErr = await Supabase.seedWorkspace();
         if (seedErr) console.warn('seed_workspace:', seedErr.message || seedErr);
 
-        const client = Supabase.getClient();
-        await Promise.all(TABLES.map(async (table) => {
-            const { data, error } = await client.from(table).select('*').eq('workspace_id', workspaceId);
-            if (error) throw error;
-            cache[table] = (data || []).map(r => fromDb(table, r));
-        }));
+const client = Supabase.getClient();
+const USERS_SELECT_COLUMNS = 'workspace_id, id, username, name, role, enabled, pay_type, hourly_rate, fixed_salary, created_at, auth_uid';
+
+await Promise.all(TABLES.map(async (table) => {
+    const selectClause = table === 'users' ? USERS_SELECT_COLUMNS : '*';
+    const { data, error } = await client.from(table).select(selectClause).eq('workspace_id', workspaceId);
+    if (error) throw error;
+    cache[table] = (data || []).map(r => fromDb(table, r));
+}));
 
         processOutbox();
         return true;
