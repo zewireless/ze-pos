@@ -63,7 +63,7 @@ const Admin = (() => {
         const client = Supabase.getClient();
         const { data, error } = await client.rpc('admin_list_clients');
         if (error) {
-            $('clientList').innerHTML = `<div class="empty-state"><h3>Error</h3><p>${App_escapeHtml(error.message || error)}</p></div>`;
+            $('clientList').innerHTML = `<div class="empty-state"><h3>Error</h3><p>${App_escapeHtml((error.message || error).toString())}</p></div>`;
             return;
         }
         renderStats(data || []);

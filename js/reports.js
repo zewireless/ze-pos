@@ -215,6 +215,15 @@ const Reports = (() => {
             const exportBtn = document.getElementById('btnExportHoursCsv');
             if (exportBtn) exportBtn.addEventListener('click', exportHoursCsv);
         }
+
+        // Re-bind load more button (renderResults replaces rptOrdersWrap which contains the button)
+        const loadMoreBtn = document.getElementById('rptLoadMore');
+        if (loadMoreBtn) {
+            loadMoreBtn.onclick = async () => {
+                await loadOrdersPage();
+                renderResults(document.getElementById('page-reports'));
+            };
+        }
         // NOTE: header controls (daily/monthly/apply) persist from renderShell,
         // so only the replaced in-wrap buttons (loadMore/export) need binding.
     }
