@@ -10,6 +10,9 @@
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>ZE-POS - Join Your Workplace</title>
     <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -70,15 +73,20 @@
                 return;
             }
 
+            const errorEl = document.getElementById('joinError');
+            const successEl = document.getElementById('joinSuccess');
+            const btn = document.getElementById('joinBtn');
+            const countdownEl = document.createElement('div');
+            countdownEl.className = 'login-error';
+            countdownEl.style.display = 'none';
+            errorEl.parentNode.insertBefore(countdownEl, errorEl.nextSibling);
+
             document.getElementById('joinForm').addEventListener('submit', async function (e) {
                 e.preventDefault();
                 const email = document.getElementById('joinEmail').value.trim();
                 const password = document.getElementById('joinPassword').value;
                 const confirm = document.getElementById('joinConfirm').value;
                 const code = document.getElementById('joinCode').value.trim().toUpperCase();
-                const errorEl = document.getElementById('joinError');
-                const successEl = document.getElementById('joinSuccess');
-                const btn = document.getElementById('joinBtn');
                 errorEl.style.display = 'none';
                 successEl.style.display = 'none';
 
@@ -93,15 +101,22 @@
                     return;
                 }
 
+                // Check lockout (client + server)
+                const check = await Lockout.preCheck('join', email);
+                if (check.locked) {
+                    Lockout.startCountdown(countdownEl, check.lockedUntil);
+                    return;
+                }
+
                 btn.disabled = true;
                 btn.textContent = 'Creating account…';
 
-                // Stash the code so we can finish joining even if this tab is closed.
-                localStorage.setItem('pending_invite_code', code);
-
                 const { user, error } = await Supabase.signUp({ email, password });
                 if (error) {
-                    localStorage.removeItem('pending_invite_code');
+                    const rec = await Lockout.record('join', email);
+                    if (rec.locked) {
+                        Lockout.startCountdown(countdownEl, rec.lockedUntil);
+                    }
                     btn.disabled = false;
                     btn.textContent = 'Create My Account';
                     errorEl.textContent = error.message || 'Could not create your account.';
@@ -117,28 +132,35 @@
                         await client.rpc('mark_join_pending');
                         const { error: joinErr } = await client.rpc('join_workspace', { p_code: code });
                         if (joinErr) {
-                            // Account was created but couldn't be linked yet — we'll
-                            // retry automatically on next sign-in (see DB.init).
+                            // Account was created but couldn't be linked to the
+                            // workspace yet. We do NOT stash the invite code in
+                            // storage (credential/secret hygiene). Send the user to
+                            // sign in with the invite code they already have.
+                            // Successfully created the account → clear lockout.
+                            await Lockout.reset('join', email);
                             btn.disabled = false;
                             btn.textContent = 'Create My Account';
                             errorEl.textContent = (joinErr.message || 'Could not join the workspace') +
-                                ' Your account was created — sign in and we’ll retry with your invite code.';
+                                ' Your account was created — sign in with your invite code to finish joining.';
                             errorEl.style.display = 'block';
                             window.location.href = 'index.html';
                             return;
                         }
-                        localStorage.removeItem('pending_invite_code');
+                        // Success — clear lockout on both sides
+                        await Lockout.reset('join', email);
+                        countdownEl.style.display = 'none';
                         await DB.init();
                         const { profile } = await Supabase.getProfile();
                         await Auth.setSession(profile);
                         window.location.href = 'app.html';
                         return;
                     } catch (err) {
-                        // Keep the pending code; DB.init retries on next login.
+                        // Account created but the workspace link failed. No invite
+                        // code is stored — have them sign in with the code they have.
                         btn.disabled = false;
                         btn.textContent = 'Create My Account';
                         errorEl.textContent = (err.message || 'Could not join the workspace') +
-                            ' Your account was created — sign in and we’ll retry with your invite code.';
+                            ' Your account was created — sign in with your invite code to finish joining.';
                         errorEl.style.display = 'block';
                         window.location.href = 'index.html';
                         return;
@@ -146,6 +168,8 @@
                 }
 
                 // Email confirmation is on — they confirm, then sign in to finish joining.
+                await Lockout.reset('join', email);
+                countdownEl.style.display = 'none';
                 btn.disabled = false;
                 btn.textContent = 'Create My Account';
                 successEl.textContent = 'Account created! Check your email for the confirmation link, then sign in with your invite code to finish joining.';

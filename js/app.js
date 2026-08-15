@@ -147,6 +147,7 @@ const App = (() => {
 
         // Clear header actions
         $('#headerActions').innerHTML = '';
+        renderStoreSwitcher();
 
         // Call module init
         switch (page) {
@@ -168,6 +169,74 @@ const App = (() => {
 
         // Close mobile sidebar
         $('#sidebar').classList.remove('open');
+    }
+
+    function refreshCurrentPage() {
+        navigateTo(currentPage);
+    }
+
+    // Render the store switcher in header actions (only if user has >1 assigned store)
+    async function renderStoreSwitcher() {
+        const container = $('#storeSwitcher');
+        const select = $('#storeSelect');
+        if (!container || !select) return;
+
+        const assigned = DB.getAssignedStores();
+        if (assigned.length <= 1) {
+            container.style.display = 'none';
+            return;
+        }
+
+        // Load all workspace stores (admin) or just assigned (cashier)
+        let stores = [];
+        if (Auth.isAdmin()) {
+            try {
+                stores = await DB.loadAllWorkspaceStores();
+            } catch (e) {
+                console.warn('loadAllWorkspaceStores:', e.message);
+                stores = [];
+            }
+        } else {
+            // For cashiers, we only have store IDs; fetch names
+            for (const sid of assigned) {
+                try {
+                    const client = Supabase.getClient();
+                    const { data } = await client
+                        .from('stores')
+                        .select('id, name')
+                        .eq('id', sid)
+                        .single();
+                    if (data) stores.push({ id: data.id, name: data.name });
+                } catch {}
+            }
+        }
+
+        if (!stores.length) {
+            container.style.display = 'none';
+            return;
+        }
+
+        const current = DB.getCurrentStore();
+        select.innerHTML = stores.map(s =>
+            `<option value="${s.id}" ${s.id === current ? 'selected' : ''}>${s.name}</option>`
+        ).join('');
+        container.style.display = 'flex';
+
+        // Bind change event (only once)
+        if (!select.dataset.bound) {
+            select.addEventListener('change', async () => {
+                const storeId = select.value;
+                if (!storeId || storeId === current) return;
+                try {
+                    await DB.setCurrentStore(storeId);
+                    toast(`Switched to ${select.options[select.selectedIndex].text}`);
+                } catch (err) {
+                    toast(err.message || 'Failed to switch store', 'error');
+                    renderStoreSwitcher(); // Reset dropdown
+                }
+            });
+            select.dataset.bound = 'true';
+        }
     }
 
     // ── Settings Page ──────────────────────────────────────────
@@ -219,6 +288,28 @@ const App = (() => {
                     </div>
                 </div>
             </div>
+
+            ${Auth.isAdmin() ? `
+            <div class="card" style="margin-top:24px;">
+                <div class="card-header">
+                    <h3>🏪 Store Management</h3>
+                    <span class="badge badge-info">Multi-store</span>
+                </div>
+                <div class="card-body">
+                    <div class="settings-grid" style="margin-bottom:24px;">
+                        <div>
+                            <h4 style="margin-bottom:12px;">Your Stores</h4>
+                            <div id="storeList"></div>
+                            <button class="btn btn-outline btn-sm" id="btnAddStore" style="margin-top:12px;">+ Add Store</button>
+                        </div>
+                        <div>
+                            <h4 style="margin-bottom:12px;">Staff Assignments</h4>
+                            <div id="storeAssignments"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            ` : ''}
         `;
 
         $('#btnSaveSettings').addEventListener('click', () => {
@@ -260,6 +351,149 @@ const App = (() => {
                 toast('Order & shift history cleared');
                 navigateTo('dashboard');
             }
+        });
+
+        // ── Store Management (admin only) ──────────────────────────
+        if (Auth.isAdmin()) {
+            renderStoreList();
+            renderStoreAssignments();
+        }
+    }
+
+    // ── Store Management UI ───────────────────────────────────────
+    async function renderStoreList() {
+        const container = $('#storeList');
+        if (!container) return;
+
+        const stores = await DB.loadAllWorkspaceStores();
+        const currentStore = DB.getCurrentStore();
+
+        container.innerHTML = stores.map(s => `
+            <div class="store-row" style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <input type="text" class="form-control store-name-input" data-id="${s.id}" value="${escapeHtml(s.name)}" style="width:180px;" ${s.id === 's1' ? 'readonly' : ''}>
+                    ${s.id === 's1' ? '<span class="badge badge-info" style="font-size:0.7rem;">Default</span>' : ''}
+                    ${s.id === currentStore ? '<span class="badge badge-success" style="font-size:0.7rem;">Active</span>' : ''}
+                    ${!s.enabled ? '<span class="badge badge-warning" style="font-size:0.7rem;">Disabled</span>' : ''}
+                </div>
+                <div style="display:flex;gap:6px;">
+                    <button class="btn btn-outline btn-sm store-save-btn" data-id="${s.id}" style="display:none;">Save</button>
+                    ${s.id !== 's1' ? `<button class="btn btn-ghost btn-sm store-delete-btn" data-id="${s.id}" style="color:var(--danger);">🗑</button>` : ''}
+                </div>
+            </div>
+        `).join('');
+
+        // Bind name change detection
+        container.querySelectorAll('.store-name-input').forEach(input => {
+            input.addEventListener('input', () => {
+                const saveBtn = container.querySelector(`.store-save-btn[data-id="${input.dataset.id}"]`);
+                if (saveBtn) saveBtn.style.display = 'inline-flex';
+            });
+        });
+
+        // Bind save
+        container.querySelectorAll('.store-save-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = btn.dataset.id;
+                const nameInput = container.querySelector(`.store-name-input[data-id="${id}"]`);
+                const name = nameInput.value.trim();
+                if (!name) { toast('Store name required', 'error'); return; }
+                try {
+                    await DB.upsertStore({ id, name });
+                    toast('Store saved');
+                    renderStoreList();
+                    renderStoreSwitcher();
+                } catch (err) {
+                    toast(err.message || 'Failed to save store', 'error');
+                }
+            });
+        });
+
+        // Bind delete
+        container.querySelectorAll('.store-delete-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = btn.dataset.id;
+                const yes = await App.confirm('Delete Store?', `Delete this store and all its data? This cannot be undone.`, 'Delete');
+                if (!yes) return;
+                try {
+                    await DB.deleteStore(id);
+                    toast('Store deleted');
+                    renderStoreList();
+                    renderStoreSwitcher();
+                } catch (err) {
+                    toast(err.message || 'Failed to delete store', 'error');
+                }
+            });
+        });
+
+        // Add new store
+        $('#btnAddStore')?.addEventListener('click', async () => {
+            const name = prompt('New store name:');
+            if (!name) return;
+            const id = 's' + Date.now().toString(36);
+            try {
+                await DB.upsertStore({ id, name });
+                toast('Store created');
+                renderStoreList();
+                renderStoreSwitcher();
+            } catch (err) {
+                toast(err.message || 'Failed to create store', 'error');
+            }
+        });
+    }
+
+    async function renderStoreAssignments() {
+        const container = $('#storeAssignments');
+        if (!container) return;
+
+        const stores = await DB.loadAllWorkspaceStores();
+        const users = DB.getAll('users').filter(u => u.enabled !== false);
+
+        // Pre-fetch assignments for all users
+        const userAssignments = {};
+        for (const u of users) {
+            userAssignments[u.id] = await DB.getUserStoreAssignments(u.id);
+        }
+
+        // Build assignment matrix
+        let html = '<div style="overflow-x:auto;"><table class="table-container"><thead><tr><th>Staff</th><th>Role</th>';
+        stores.forEach(s => { html += `<th style="text-align:center;width:80px;">${escapeHtml(s.name)}</th>`; });
+        html += '</tr></thead><tbody>';
+
+        users.forEach(u => {
+            const isAdmin = u.role === 'admin';
+            html += `<tr><td><strong>${escapeHtml(u.name)}</strong></td><td><span class="badge ${isAdmin ? 'badge-primary' : 'badge-success'}">${isAdmin ? 'Admin' : 'Cashier'}</span></td>`;
+            stores.forEach(s => {
+                const assigned = isAdmin || userAssignments[u.id]?.includes(s.id);
+                html += `<td style="text-align:center;">
+                    <input type="checkbox" class="assign-checkbox" data-user="${u.id}" data-store="${s.id}" ${assigned ? 'checked' : ''} ${isAdmin ? 'disabled' : ''}>
+                    ${isAdmin ? '<span class="text-muted" style="font-size:0.75rem;">(admin)</span>' : ''}
+                </td>`;
+            });
+            html += '</tr>';
+        });
+
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+
+        // Bind checkbox changes
+        container.querySelectorAll('.assign-checkbox').forEach(cb => {
+            cb.addEventListener('change', async () => {
+                const userId = cb.dataset.user;
+                const storeId = cb.dataset.store;
+                try {
+                    if (cb.checked) {
+                        await DB.assignUserToStore(userId, storeId);
+                        toast('Assigned');
+                    } else {
+                        await DB.unassignUserFromStore(userId, storeId);
+                        toast('Unassigned');
+                    }
+                } catch (err) {
+                    toast(err.message || 'Failed', 'error');
+                    cb.checked = !cb.checked; // revert
+                }
+            });
         });
     }
 

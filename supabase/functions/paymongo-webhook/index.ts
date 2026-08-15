@@ -7,6 +7,12 @@
 // id cannot inject an arbitrary profile_id/amount. Payment recording happens via
 // billing_paymongo_record (service-role-only RPC) with idempotency on reference.
 //
+// IDEMPOTENCY: Webhook events are logged to audit_log with the PayMongo event_id
+// as entity_id. Duplicate deliveries of the same event are detected and skipped.
+//
+// FALLBACK VALIDATION: If plan_id missing from checkout metadata, we resolve it
+// from the profile's current plan_id and verify amount against that plan's price.
+//
 // Env secrets:
 //   PAYMONGO_SECRET_KEY        (re-fetch + verify the event)
 //   SUPABASE_SERVICE_ROLE_KEY  (auto-injected by Supabase)
@@ -65,19 +71,44 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
-    // Amount sanity check: the verified amount must cover the plan price (when
-    // we can resolve the plan). A zero/partial payment never activates a month.
-    let amountOk = amountPhp > 0;
-    if (amountOk && planId) {
-        const { data: plan, error: planErr } = await supabase
+    // IDEMPOTENCY: Check if we've already processed this webhook event.
+    // We log webhook events to audit_log with action='paymongo_webhook' and
+    // entity_id = PayMongo event_id. If it exists, skip processing.
+    const { data: existingLog } = await supabase
+        .from('audit_log')
+        .select('id')
+        .eq('action', 'paymongo_webhook')
+        .eq('entity_id', eventId)
+        .maybeSingle();
+    if (existingLog) {
+        return json({ ok: true, handled: true, duplicate: true });
+    }
+
+    // FALLBACK VALIDATION: If plan_id not in metadata, resolve from profile.
+    let resolvedPlanId = planId;
+    let planPrice = 0;
+    if (!resolvedPlanId) {
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('plan_id')
+            .eq('id', profileId)
+            .maybeSingle();
+        resolvedPlanId = profile?.plan_id || null;
+    }
+    // Fetch the plan price (from metadata plan_id or profile's plan_id)
+    if (resolvedPlanId) {
+        const { data: plan } = await supabase
             .from('plans')
             .select('price_monthly')
-            .eq('id', planId)
+            .eq('id', resolvedPlanId)
             .maybeSingle();
-        if (!planErr && plan) {
-            amountOk = amountPhp >= Number(plan.price_monthly || 0);
-        }
+        planPrice = plan ? Number(plan.price_monthly || 0) : 0;
     }
+
+    // Amount sanity check: verified amount must cover the plan price.
+    // If we couldn't resolve a plan, require at least the minimum known plan price.
+    const minPlanPrice = planPrice > 0 ? planPrice : 999.00; // default ZE-POS Monthly
+    const amountOk = amountPhp >= minPlanPrice;
     if (!amountOk) return json({ ok: false, error: 'Amount does not cover plan' }, 400);
 
     // Record via the service-role-only RPC (idempotent on reference).
@@ -88,6 +119,22 @@ Deno.serve(async (req) => {
         p_reference: reference,
     });
     if (error) return json({ ok: false, error: error.message }, 500);
+
+    // AUDIT LOG: Record the webhook event for idempotency and traceability.
+    // Uses billing_log_webhook which resolves the workspace from the profile
+    // (log_action can't run as service_role because it needs auth.uid()).
+    await supabase.rpc('billing_log_webhook', {
+        p_profile_id: profileId,
+        p_event_id: eventId,
+        p_details: {
+            profile_id: profileId,
+            plan_id: resolvedPlanId,
+            amount_php: amountPhp,
+            reference,
+            checkout_session_id: cs?.id,
+            event_type: eventType,
+        },
+    }).catch(err => console.warn('audit log failed:', err.message));
 
     return json({ ok: true, handled: true });
 });

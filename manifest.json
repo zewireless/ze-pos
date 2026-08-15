@@ -3,9 +3,11 @@
     "short_name": "ZE-POS",
     "description": "Cloud Point of Sale — subscriptions, orders, and payroll",
     "start_url": "index.html",
+    "id": "/",
+    "scope": "./",
     "display": "standalone",
     "background_color": "#ffffff",
-    "theme_color": "#6366f1",
+    "theme_color": "#4f46e5",
     "orientation": "any",
     "icons": [
         {

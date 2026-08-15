@@ -62,6 +62,39 @@ const Supabase = (() => {
         return error;
     }
 
+    // ── Server-side auth lockout (migration 006) ──────────────────────
+    // Best-effort: returns {locked, msRemaining}. If the migration hasn't
+    // been deployed these RPCs don't exist and callers fall back to the
+    // client-side Lockout layer.
+
+    async function checkAuthLock(ns, id) {
+        if (!client) return { locked: false, msRemaining: 0 };
+        const { data, error } = await client.rpc('check_auth_lock', {
+            p_ns: ns, p_id: id,
+        });
+        if (error) return { locked: false, msRemaining: 0 };
+        const ms = data && data.ms_remaining ? Number(data.ms_remaining) : 0;
+        return { locked: !!(data && data.locked), msRemaining: ms };
+    }
+
+    async function recordAuthFailure(ns, id) {
+        if (!client) return { locked: false, msRemaining: 0 };
+        const { data, error } = await client.rpc('record_auth_failure', {
+            p_ns: ns, p_id: id,
+        });
+        if (error) return { locked: false, msRemaining: 0 };
+        const ms = data && data.ms_remaining ? Number(data.ms_remaining) : 0;
+        return { locked: !!(data && data.locked), msRemaining: ms };
+    }
+
+    async function clearAuthLock(ns, id) {
+        if (!client) return null;
+        const { error } = await client.rpc('clear_auth_lock', {
+            p_ns: ns, p_id: id,
+        });
+        return error || null;
+    }
+
     return {
         init,
         getClient,
@@ -71,5 +104,8 @@ const Supabase = (() => {
         signIn,
         signOut,
         seedWorkspace,
+        checkAuthLock,
+        recordAuthFailure,
+        clearAuthLock,
     };
 })();

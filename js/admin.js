@@ -6,6 +6,7 @@
 const Admin = (() => {
     let modalResolve = null;
     let confirmResolve = null;
+    let selfId = null;
 
     // ── tiny UI helpers (this page doesn't load app.js) ─────────
     function $(id) { return document.getElementById(id); }
@@ -45,6 +46,7 @@ const Admin = (() => {
         if (!session) { window.location.href = 'index.html'; return; }
         const { profile } = await Supabase.getProfile();
         if (!profile || !profile.is_super_admin) { window.location.href = 'app.html'; return; }
+        selfId = profile.id;
         $('adminUser').textContent = profile.business_name || 'Owner';
 
         $('btnAdminLogout').addEventListener('click', () => Supabase.signOut().then(() => { window.location.href = 'index.html'; }));
@@ -118,6 +120,7 @@ const Admin = (() => {
                             <th>Status</th>
                             <th>Renews</th>
                             <th>Last Payment</th>
+                            <th>Operator</th>
                             <th style="text-align:right;">Actions</th>
                         </tr>
                     </thead>
@@ -132,6 +135,13 @@ const Admin = (() => {
                                 <td>${statusBadge(c.subscription_status)}</td>
                                 <td class="text-muted">${c.current_period_end ? fmtDate(c.current_period_end) : '—'}</td>
                                 <td class="text-muted">${c.last_payment_at ? fmtDate(c.last_payment_at) : '—'}</td>
+                                <td class="text-center">
+                                    ${c.is_super_admin
+                                        ? (c.id === selfId
+                                            ? '<span class="badge badge-success" title="You cannot change your own operator status">🛡 Operator</span>'
+                                            : `<button class="btn btn-danger btn-sm" data-action="demote" data-id="${c.id}" data-name="${App_escapeHtml(c.business_name)}" data-email="${App_escapeHtml(c.email)}" title="Demote to normal client">🛡 Demote</button>`)
+                                        : `<button class="btn btn-success btn-sm" data-action="promote" data-id="${c.id}" data-name="${App_escapeHtml(c.business_name)}" data-email="${App_escapeHtml(c.email)}">➕ Make Operator</button>`}
+                                </td>
                                 <td class="text-right">
                                     <div class="btn-group" style="justify-content:flex-end;flex-wrap:wrap;">
                                         <button class="btn btn-success btn-sm" data-action="pay" data-id="${c.id}" data-name="${App_escapeHtml(c.business_name)}">💰 Pay</button>
@@ -150,11 +160,13 @@ const Admin = (() => {
 
         $('clientList').querySelectorAll('[data-action]').forEach(btn => {
             btn.addEventListener('click', () => {
-                const { action, id, name } = btn.dataset;
+                const { action, id, name, email } = btn.dataset;
                 if (action === 'pay') recordPayment(id, name);
                 else if (action === 'history') viewPayments(id, name);
                 else if (action === 'cancel') setStatus(id, 'cancelled', `Cancel ${name}'s subscription? They'll lose access immediately.`);
                 else if (action === 'overdue') setStatus(id, 'overdue', `Mark ${name} as overdue?`);
+                else if (action === 'promote') setOperator(id, true, `Make ${name} (${email}) a platform operator?`);
+                else if (action === 'demote') setOperator(id, false, `Demote ${name} (${email}) to a normal client?`);
             });
         });
     }
@@ -258,6 +270,16 @@ const Admin = (() => {
         const { error } = await client.rpc('admin_set_subscription_status', { p_profile: id, p_status: status });
         if (error) { toast(error.message || 'Could not update status', 'error'); return; }
         toast('Status updated');
+        load();
+    }
+
+    async function setOperator(id, make, message) {
+        const yes = await confirmDialog('Confirm', message, make ? 'Make Operator' : 'Demote');
+        if (!yes) return;
+        const client = Supabase.getClient();
+        const { error } = await client.rpc('admin_set_super_admin', { p_profile: id, p_make: make });
+        if (error) { toast(error.message || 'Could not change operator status', 'error'); return; }
+        toast(make ? 'Promoted to operator' : 'Demoted to client');
         load();
     }
 

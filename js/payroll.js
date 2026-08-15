@@ -175,7 +175,7 @@ const Payroll = (() => {
     }
 
     function restaurantName() {
-        return DB.getSetting('restaurant_name') || 'FoodZone POS';
+        return DB.getSetting('restaurant_name') || 'ZE-POS';
     }
 
     // ── render ────────────────────────────────────────────────

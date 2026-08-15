@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   FoodZone POS – Complete Stylesheet
+   ZE-POS – Complete Stylesheet
    ═══════════════════════════════════════════════════════════ */
 
 /* ── Variables ──────────────────────────────────────────────── */
@@ -364,6 +364,29 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
     display: flex;
     align-items: center;
     gap: 12px;
+}
+
+/* Store Switcher */
+.store-switcher {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    background: var(--bg);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+}
+.store-switcher-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+.store-switcher select.form-control-sm {
+    min-width: 140px;
+    padding: 6px 10px;
+    font-size: 0.85rem;
+    border-radius: var(--radius);
 }
 .content-area {
     flex: 1;
@@ -1074,6 +1097,21 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 @keyframes slideIn {
     from { transform: translateX(100%); opacity: 0; }
     to { transform: translateX(0); opacity: 1; }
+}
+
+/* ── Loading skeleton (reports progressive rendering) ──────── */
+.skeleton {
+    background: linear-gradient(90deg, var(--bg) 25%, var(--border) 37%, var(--bg) 63%);
+    background-size: 400% 100%;
+    border-radius: 4px;
+    animation: skeletonShimmer 1.2s ease-in-out infinite;
+    display: inline-block;
+    height: 14px;
+    vertical-align: middle;
+}
+@keyframes skeletonShimmer {
+    0% { background-position: 100% 50%; }
+    100% { background-position: 0 50%; }
 }
 
 /* ── Chart Container ────────────────────────────────────────── */

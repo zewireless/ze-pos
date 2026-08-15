@@ -10,6 +10,9 @@
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>ZE-POS - Create Account</title>
     <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -70,21 +73,33 @@
                 return;
             }
 
+            const errorEl = document.getElementById('regError');
+            const successEl = document.getElementById('regSuccess');
+            const btn = document.getElementById('regBtn');
+            const countdownEl = document.createElement('div');
+            countdownEl.className = 'login-error';
+            countdownEl.style.display = 'none';
+            errorEl.parentNode.insertBefore(countdownEl, errorEl.nextSibling);
+
             document.getElementById('regForm').addEventListener('submit', async function (e) {
                 e.preventDefault();
                 const businessName = document.getElementById('businessName').value.trim();
                 const email = document.getElementById('regEmail').value.trim();
                 const password = document.getElementById('regPassword').value;
                 const confirm = document.getElementById('regConfirm').value;
-                const errorEl = document.getElementById('regError');
-                const successEl = document.getElementById('regSuccess');
-                const btn = document.getElementById('regBtn');
                 errorEl.style.display = 'none';
                 successEl.style.display = 'none';
 
                 if (password !== confirm) {
                     errorEl.textContent = 'Passwords do not match.';
                     errorEl.style.display = 'block';
+                    return;
+                }
+
+                // Check lockout (client + server)
+                const check = await Lockout.preCheck('reg', email);
+                if (check.locked) {
+                    Lockout.startCountdown(countdownEl, check.lockedUntil);
                     return;
                 }
 
@@ -95,10 +110,18 @@
                 btn.textContent = 'Create Account';
 
                 if (error) {
+                    const rec = await Lockout.record('reg', email);
+                    if (rec.locked) {
+                        Lockout.startCountdown(countdownEl, rec.lockedUntil);
+                    }
                     errorEl.textContent = error.message || 'Could not create your account.';
                     errorEl.style.display = 'block';
                     return;
                 }
+
+                // Success — clear lockout on both sides
+                await Lockout.reset('reg', email);
+                countdownEl.style.display = 'none';
 
                 // If email confirmation is off, Supabase returns a session → log straight in.
                 const newSession = await Supabase.getSession();

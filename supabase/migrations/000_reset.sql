@@ -49,6 +49,20 @@ drop function if exists public.owns_row(text) cascade;
 drop function if exists public.log_action(text, text, text, jsonb) cascade;
 drop function if exists public.billing_paymongo_record(uuid, numeric, text, text) cascade;
 
+-- 004 functions
+drop function if exists public.admin_set_super_admin(uuid, boolean) cascade;
+-- admin_list_clients() is redefined with a new return shape in 004; reset must
+-- drop the 004 version (it's recreated lazily by re-running 001/002/004).
+drop function if exists public.admin_list_clients() cascade;
+
+-- 005 functions & tables
+drop table if exists public.stores cascade;
+drop table if exists public.user_stores cascade;
+drop function if exists public.current_store() cascade;
+drop function if exists public.set_current_store(text) cascade;
+drop function if exists public.assigned_stores() cascade;
+drop function if exists public.is_store_admin(text) cascade;
+
 -- Drop trigger on auth.users
 drop trigger if exists on_auth_user_created on auth.users;
 

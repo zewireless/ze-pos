@@ -9,6 +9,21 @@
  *  4. Turn OFF "Confirm email" in Auth settings so clients can log in immediately.
  *  5. In your Supabase account row (auth.users → profiles), set is_super_admin = true
  *     for YOUR account to unlock the /admin.html dashboard.
+ *
+ * EMAIL / PASSWORD RESET SETUP (required for the "Forgot password?" flow):
+ *   1. Supabase dashboard → Authentication → URL Configuration →
+ *      "Redirect URLs": add this app's origin, e.g.
+ *        https://your-github-pages-or-domain
+ *        http://localhost:5500            (for local `python -m http.server 5500`)
+ *      The reset link redirects to origin + '/index.html' (see Auth.requestPasswordReset).
+ *   2. Authentication → Email Templates → "Reset Password": keep the default
+ *      template containing {{ .ConfirmationURL }}. Supabase appends
+ *      #access_token=...&type=recovery to the redirect, which index.html reads
+ *      to show the "Set New Password" form. If you use a custom template, the
+ *      link MUST point at {{ .ConfirmationURL }} (not just {{ .Token }}).
+ *   3. Project Settings → Auth → SMTP: configure a custom SMTP sender (or enable
+ *      Supabase's email provider) so reset emails actually deliver.
+ *   Note: "Confirm email" (signup) can stay ON; it is independent of reset email.
  */
 window.ZE_CONFIG = {
     // ── Supabase ──────────────────────────────────────────────

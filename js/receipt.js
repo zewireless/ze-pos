@@ -6,7 +6,7 @@ const Receipt = (() => {
         if (!order) return;
 
         const items = DB.query('order_items', i => i.orderId === order.id);
-        const restaurantName = DB.getSetting('restaurant_name') || 'FoodZone POS';
+        const restaurantName = DB.getSetting('restaurant_name') || 'ZE-POS';
         const address = DB.getSetting('restaurant_address') || '';
         const phone = DB.getSetting('restaurant_phone') || '';
 
@@ -100,7 +100,7 @@ const Receipt = (() => {
         const orders = DB.query('orders', o => o.shiftId === shift.id)
             .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
         const totalSales = orders.reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
-        const restaurantName = DB.getSetting('restaurant_name') || 'FoodZone POS';
+        const restaurantName = DB.getSetting('restaurant_name') || 'ZE-POS';
         const address = DB.getSetting('restaurant_address') || '';
         const phone = DB.getSetting('restaurant_phone') || '';
 

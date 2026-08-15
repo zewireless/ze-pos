@@ -254,6 +254,12 @@ const Staff = (() => {
                     hourlyRate,
                     fixedSalary,
                 });
+                // Auto-assign new staff to current store
+                try {
+                    await DB.assignUserToStore(rec.id, DB.getCurrentStore());
+                } catch (e) {
+                    console.warn('Auto-assign store failed:', e.message);
+                }
                 DB.logAction('staff_add', 'users', rec.id, { name, username, role, payType });
                 App.toast('Staff member added. Click 🔗 Invite to give them sign-in access.');
             }

@@ -1,5 +1,13 @@
 /**
  * Reports – Daily & Monthly sales reports
+ *
+ * OPTIMIZED (007): Order/shifts queries are now server-side (RPC report_orders /
+ * report_shifts), scoped to the current workspace+store, with date-range +
+ * cashier filters pushed to the database. Results are paginated (LIMIT/OFFSET)
+ * with a "Load more" control and progressive rendering + loading skeletons so
+ * large periods stay responsive. The summary stat cards are computed from the
+ * currently-loaded page (not the entire table), which is the correct scope for
+ * an on-screen report and keeps memory/data-transfer bounded.
  */
 const Reports = (() => {
     let reportType = 'daily';
@@ -7,8 +15,32 @@ const Reports = (() => {
     let filterDateTo = '';
     let filterCashier = '';
 
-    function render() {
+    // Pagination state (reset whenever filters change)
+    const PAGE = 100;
+    let loadedOrders = [];
+    let loadedShifts = [];
+    let ordersHasMore = false;
+    let shiftsHasMore = false;
+    let loadingOrders = false;
+    let loadingShifts = false;
+
+    function toTimestamptz(dateStr) {
+        return dateStr ? `${dateStr}T00:00:00` : null;
+    }
+    function toTimestamptzEnd(dateStr) {
+        return dateStr ? `${dateStr}T23:59:59` : null;
+    }
+
+    function resetPagination() {
+        loadedOrders = [];
+        loadedShifts = [];
+        ordersHasMore = false;
+        shiftsHasMore = false;
+    }
+
+    async function render() {
         const el = document.getElementById('page-reports');
+        if (!el) return;
         const today = new Date().toISOString().split('T')[0];
 
         if (!filterDateFrom) {
@@ -16,22 +48,62 @@ const Reports = (() => {
                 filterDateFrom = today;
                 filterDateTo = today;
             } else {
-                // Default to current month
                 const d = new Date();
                 filterDateFrom = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
                 filterDateTo = today;
             }
         }
 
-        const orders = getFilteredOrders();
-        const summary = calcSummary(orders);
+        // First paint: shell + loading skeleton. Data loads progressively.
+        renderShell(el, today);
+        bindShell(el);
 
-        // Working hours & OT for the same period (closed shifts)
-        const workShifts = getShiftsInRange();
+        await loadOrdersPage(true);
+        await loadShiftsPage(true);
+        renderResults(el);
+    }
+
+    // ── data loaders ───────────────────────────────────────────
+    async function loadOrdersPage(reset = false) {
+        if (loadingOrders) return;
+        loadingOrders = true;
+        if (reset) resetPagination();
+        const offset = loadedOrders.length;
+        const { rows, hasMore } = await DB.queryOrders({
+            from: toTimestamptz(filterDateFrom),
+            to: toTimestamptzEnd(filterDateTo),
+            userId: (Auth.isAdmin() && filterCashier) ? filterCashier : (Auth.isAdmin() ? null : (Auth.currentUser() && Auth.currentUser().id)),
+            limit: PAGE,
+            offset,
+        });
+        loadedOrders = loadedOrders.concat(rows.slice(0, PAGE));
+        ordersHasMore = hasMore && rows.length > PAGE;
+        loadingOrders = false;
+    }
+
+    async function loadShiftsPage(reset = false) {
+        if (loadingShifts) return;
+        loadingShifts = true;
+        const offset = loadedShifts.length;
+        const { rows, hasMore } = await DB.queryShifts({
+            from: toTimestamptz(filterDateFrom),
+            to: toTimestamptzEnd(filterDateTo),
+            userId: (Auth.isAdmin() && filterCashier) ? filterCashier : (Auth.isAdmin() ? null : (Auth.currentUser() && Auth.currentUser().id)),
+            limit: PAGE,
+            offset,
+        });
+        loadedShifts = loadedShifts.concat(rows.slice(0, PAGE));
+        shiftsHasMore = hasMore && rows.length > PAGE;
+        loadingShifts = false;
+    }
+
+    // ── shell (filters + summary + containers, no data yet) ────
+    function renderShell(el, today) {
+        const orders = loadedOrders;
+        const summary = calcSummary(orders);
         const daysInRange = filterDateFrom && filterDateTo
             ? Math.round((new Date(`${filterDateTo}T23:59:59`) - new Date(`${filterDateFrom}T00:00:00`)) / 86400000) + 1
             : 1;
-        const workSummary = workShifts.length ? Payroll.summaryForShifts(workShifts, daysInRange) : [];
 
         el.innerHTML = `
             <div class="card">
@@ -64,157 +136,204 @@ const Reports = (() => {
                             <div class="stat-icon green">💵</div>
                             <div class="stat-info">
                                 <div class="stat-label">Total Revenue</div>
-                                <div class="stat-value">${App.formatCurrency(summary.revenue)}</div>
+                                <div class="stat-value" id="rptRevenue">${App.formatCurrency(summary.revenue)}</div>
                             </div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-icon blue">📦</div>
                             <div class="stat-info">
-                                <div class="stat-label">Total Orders</div>
-                                <div class="stat-value">${summary.orderCount}</div>
+                                <div class="stat-label">Orders (loaded)</div>
+                                <div class="stat-value" id="rptCount">${loadedOrders.length}</div>
                             </div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-icon purple">📊</div>
                             <div class="stat-info">
                                 <div class="stat-label">Avg Order Value</div>
-                                <div class="stat-value">${summary.orderCount > 0 ? App.formatCurrency(summary.revenue / summary.orderCount) : App.formatCurrency(0)}</div>
+                                <div class="stat-value" id="rptAvg">${summary.orderCount > 0 ? App.formatCurrency(summary.revenue / summary.orderCount) : App.formatCurrency(0)}</div>
                             </div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-icon orange">💰</div>
                             <div class="stat-info">
                                 <div class="stat-label">Tax Collected</div>
-                                <div class="stat-value">${App.formatCurrency(summary.taxTotal)}</div>
+                                <div class="stat-value" id="rptTax">${App.formatCurrency(summary.taxTotal)}</div>
                             </div>
                         </div>
                     </div>
 
-                    ${orders.length > 0 ? `
-                        <h4 style="margin-bottom:12px;">Order Details</h4>
-                        <div class="table-container">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Order #</th>
-                                        <th>Type</th>
-                                        <th>Subtotal</th>
-                                        <th>Tax</th>
-                                        <th>Total</th>
-                                        <th>Date</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${orders.map(o => `
-                                        <tr>
-                                            <td><strong>#${o.orderNumber}</strong></td>
-                                            <td><span class="badge badge-info">${App.escapeHtml(o.type)}</span></td>
-                                            <td>${App.formatCurrency(o.subtotal)}</td>
-                                            <td>${App.formatCurrency(o.taxAmount)}</td>
-                                            <td><strong>${App.formatCurrency(o.total)}</strong></td>
-                                            <td class="text-muted">${App.formatDateTime(o.createdAt)}</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                                <tfoot>
-                                    <tr style="background:var(--bg);font-weight:700;">
-                                        <td colspan="2">Total</td>
-                                        <td>${App.formatCurrency(summary.subtotal)}</td>
-                                        <td>${App.formatCurrency(summary.taxTotal)}</td>
-                                        <td>${App.formatCurrency(summary.revenue)}</td>
-                                        <td></td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    ` : `
-                        <div class="empty-state">
-                            <span class="icon">📈</span>
-                            <h3>No data for this period</h3>
-                            <p>Try a different date range.</p>
-                        </div>
-                    `}
+                    <div id="rptOrdersWrap">
+                        ${orders.length > 0 ? renderOrderTable(orders, summary) : renderLoading('orders')}
+                    </div>
 
-                    ${Auth.isAdmin() && orders.length > 0 ? renderCashierBreakdown(orders) : ''}
+                    ${Auth.isAdmin() && orders.length > 0 ? `<div id="rptCashierWrap">${renderCashierBreakdown(orders)}</div>` : ''}
+
+                    <div id="rptHoursWrap"></div>
                 </div>
             </div>
-
-            ${workSummary.length ? renderHoursCard(workSummary, filterDateFrom, filterDateTo) : ''}
         `;
+    }
 
-        // Bind events
-        document.getElementById('rptDaily').addEventListener('click', () => {
+    // ── results (after data loaded) ─────────────────────────────
+    function renderResults(el) {
+        const orders = loadedOrders;
+        const summary = calcSummary(orders);
+
+        // Update summary stat cards in place
+        const rev = document.getElementById('rptRevenue');
+        const cnt = document.getElementById('rptCount');
+        const avg = document.getElementById('rptAvg');
+        const tax = document.getElementById('rptTax');
+        if (rev) rev.textContent = App.formatCurrency(summary.revenue);
+        if (cnt) cnt.textContent = loadedOrders.length;
+        if (avg) avg.textContent = summary.orderCount > 0 ? App.formatCurrency(summary.revenue / summary.orderCount) : App.formatCurrency(0);
+        if (tax) tax.textContent = App.formatCurrency(summary.taxTotal);
+
+        // Orders table
+        const ordersWrap = document.getElementById('rptOrdersWrap');
+        if (ordersWrap) {
+            ordersWrap.innerHTML = orders.length > 0
+                ? renderOrderTable(orders, summary)
+                : `<div class="empty-state"><span class="icon">📈</span><h3>No data for this period</h3><p>Try a different date range.</p></div>`;
+        }
+
+        // Cashier breakdown (admin)
+        const cashierWrap = document.getElementById('rptCashierWrap');
+        if (cashierWrap) {
+            cashierWrap.innerHTML = renderCashierBreakdown(orders);
+        }
+
+        // Working hours card
+        const hoursWrap = document.getElementById('rptHoursWrap');
+        if (hoursWrap) {
+            const daysInRange = filterDateFrom && filterDateTo
+                ? Math.round((new Date(`${filterDateTo}T23:59:59`) - new Date(`${filterDateFrom}T00:00:00`)) / 86400000) + 1
+                : 1;
+            const workSummary = loadedShifts.length ? Payroll.summaryForShifts(loadedShifts, daysInRange) : [];
+            hoursWrap.innerHTML = workSummary.length ? renderHoursCard(workSummary, filterDateFrom, filterDateTo) : '';
+
+            const exportBtn = document.getElementById('btnExportHoursCsv');
+            if (exportBtn) exportBtn.addEventListener('click', exportHoursCsv);
+        }
+        // NOTE: header controls (daily/monthly/apply) persist from renderShell,
+        // so only the replaced in-wrap buttons (loadMore/export) need binding.
+    }
+
+    function renderLoading(kind) {
+        const rows = Array.from({ length: 6 }).map(() => `
+            <tr>
+                <td><span class="skeleton" style="display:inline-block;width:48px;height:14px;"></span></td>
+                <td><span class="skeleton" style="display:inline-block;width:60px;height:14px;"></span></td>
+                <td><span class="skeleton" style="display:inline-block;width:70px;height:14px;"></span></td>
+                <td><span class="skeleton" style="display:inline-block;width:60px;height:14px;"></span></td>
+                <td><span class="skeleton" style="display:inline-block;width:70px;height:14px;"></span></td>
+                <td><span class="skeleton" style="display:inline-block;width:120px;height:14px;"></span></td>
+            </tr>
+        `).join('');
+        return `
+            <h4 style="margin:16px 0 12px;">Order Details</h4>
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>Order #</th><th>Type</th><th>Subtotal</th><th>Tax</th><th>Total</th><th>Date</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    function renderOrderTable(orders, summary) {
+        const loadBtn = ordersHasMore
+            ? `<div style="text-align:center;margin:14px 0;">
+                 <button class="btn btn-outline btn-sm" id="rptLoadMore">Load more orders (${loadedOrders.length} shown)</button>
+               </div>`
+            : '';
+
+        return `
+            <h4 style="margin:16px 0 12px;">Order Details</h4>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Order #</th>
+                            <th>Type</th>
+                            <th>Subtotal</th>
+                            <th>Tax</th>
+                            <th>Total</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${orders.map(o => `
+                            <tr>
+                                <td><strong>#${o.orderNumber}</strong></td>
+                                <td><span class="badge badge-info">${App.escapeHtml(o.type)}</span></td>
+                                <td>${App.formatCurrency(o.subtotal)}</td>
+                                <td>${App.formatCurrency(o.taxAmount)}</td>
+                                <td><strong>${App.formatCurrency(o.total)}</strong></td>
+                                <td class="text-muted">${App.formatDateTime(o.createdAt)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background:var(--bg);font-weight:700;">
+                            <td colspan="2">Total</td>
+                            <td>${App.formatCurrency(summary.subtotal)}</td>
+                            <td>${App.formatCurrency(summary.taxTotal)}</td>
+                            <td>${App.formatCurrency(summary.revenue)}</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            ${loadBtn}
+        `;
+    }
+
+    function bindShell(el) {
+        const daily = document.getElementById('rptDaily');
+        const monthly = document.getElementById('rptMonthly');
+        const custom = document.getElementById('rptCustom');
+        const apply = document.getElementById('rptApply');
+        const loadMore = document.getElementById('rptLoadMore');
+        const cashierSelect = document.getElementById('rptCashier');
+
+        if (daily) daily.addEventListener('click', () => {
             reportType = 'daily';
-            filterDateFrom = today;
-            filterDateTo = today;
+            const t = new Date().toISOString().split('T')[0];
+            filterDateFrom = t; filterDateTo = t;
             render();
         });
-        document.getElementById('rptMonthly').addEventListener('click', () => {
+        if (monthly) monthly.addEventListener('click', () => {
             reportType = 'monthly';
             const d = new Date();
             filterDateFrom = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
-            filterDateTo = today;
+            filterDateTo = new Date().toISOString().split('T')[0];
             render();
         });
-        document.getElementById('rptCustom').addEventListener('click', () => {
-            reportType = 'custom';
-        });
-        document.getElementById('rptApply').addEventListener('click', () => {
+        if (custom) custom.addEventListener('click', () => { reportType = 'custom'; });
+
+        if (apply) apply.addEventListener('click', () => {
             filterDateFrom = document.getElementById('rptDateFrom').value;
             filterDateTo = document.getElementById('rptDateTo').value;
-            const cashierSelect = document.getElementById('rptCashier');
-            filterCashier = cashierSelect ? cashierSelect.value : '';
+            const cs = document.getElementById('rptCashier');
+            filterCashier = cs ? cs.value : '';
             render();
         });
 
-        const cashierSelect = document.getElementById('rptCashier');
-        if (cashierSelect) {
-            cashierSelect.addEventListener('change', (e) => {
-                filterCashier = e.target.value;
-            });
-        }
+        if (cashierSelect) cashierSelect.addEventListener('change', (e) => {
+            filterCashier = e.target.value;
+        });
 
-        const exportHoursBtn = document.getElementById('btnExportHoursCsv');
-        if (exportHoursBtn) {
-            exportHoursBtn.addEventListener('click', exportHoursCsv);
-        }
+        if (loadMore) loadMore.addEventListener('click', async () => {
+            loadMore.disabled = true;
+            loadMore.textContent = 'Loading…';
+            await loadOrdersPage(false);
+            const el2 = document.getElementById('page-reports');
+            if (el2) renderResults(el2);
+        });
     }
 
-    function getFilteredOrders() {
-        let orders = DB.getAll('orders');
-        if (filterDateFrom) {
-            orders = orders.filter(o => o.createdAt && o.createdAt.split('T')[0] >= filterDateFrom);
-        }
-        if (filterDateTo) {
-            orders = orders.filter(o => o.createdAt && o.createdAt.split('T')[0] <= filterDateTo);
-        }
-        // Non-admins only see their own orders
-        if (!Auth.isAdmin()) {
-            const user = Auth.currentUser();
-            orders = orders.filter(o => o.userId === user.id);
-        } else if (filterCashier) {
-            orders = orders.filter(o => o.userId === filterCashier);
-        }
-        return orders.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-    }
-
-    function getShiftsInRange() {
-        let shifts = DB.getAll('shifts').filter(s => s.status === 'closed' && s.endTime);
-        // Non-admins only see their own shifts
-        if (!Auth.isAdmin()) {
-            const user = Auth.currentUser();
-            shifts = shifts.filter(s => s.userId === user.id);
-        } else if (filterCashier) {
-            shifts = shifts.filter(s => s.userId === filterCashier);
-        }
-        if (filterDateFrom) {
-            shifts = shifts.filter(s => s.startTime && s.startTime.split('T')[0] >= filterDateFrom);
-        }
-        if (filterDateTo) {
-            shifts = shifts.filter(s => s.startTime && s.startTime.split('T')[0] <= filterDateTo);
-        }
-        return shifts;
-    }
+    function getShiftsInRange() { return loadedShifts; }
 
     function renderHoursCard(summary, from, to) {
         const totalHours = summary.reduce((s, r) => s + r.hours, 0);
@@ -313,7 +432,6 @@ const Reports = (() => {
     }
 
     function renderCashierBreakdown(orders) {
-        // Group orders by cashier
         const cashierMap = {};
         orders.forEach(o => {
             const key = o.userId || 'unknown';
@@ -325,7 +443,6 @@ const Reports = (() => {
         });
 
         const cashiers = Object.values(cashierMap).sort((a, b) => b.revenue - a.revenue);
-
         if (cashiers.length <= 1) return '';
 
         return `
