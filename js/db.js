@@ -1,5 +1,5 @@
 /**
- * DB – cloud-backed, local-first data layer with multi-store support.
+ * DB – cloud-backed, local-first data layer with multi-store support.  
  *
  * Keeps the exact synchronous API the app modules use
  * (getAll / getById / query / insert / update / remove / count / clear /
