@@ -99,7 +99,7 @@
                 document.getElementById('loginError').style.display = 'none';
                 document.querySelector('.login-hint').style.display = 'none';
 
-                document.getElementById('resetBtn').addEventListener('click', async function (e) {
+                document.getElementById('loginForm').addEventListener('submit', async function (e) {
                     e.preventDefault();
                     const newPassword = document.getElementById('newPassword').value;
                     const confirmPassword = document.getElementById('confirmPassword').value;
