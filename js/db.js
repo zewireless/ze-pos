@@ -22,6 +22,19 @@ const DB = (() => {
         'orders', 'order_items', 'shifts', 'shift_schedules', 'payrolls', 'settings',
     ];
 
+    // public.users only grants SELECT on these columns to anon/authenticated
+    // (migration 003 deliberately excludes `password`; 008 added `store_id`
+    // to this list). PostgREST expands select('*') to every column on the
+    // table at parse time and checks privileges against ALL of them, so a
+    // bare '*' against `users` always 403s (42501) even though the column
+    // grant covers everything the app actually needs. Every hydration of the
+    // `users` table must use this explicit list instead of '*'.
+    const USERS_SAFE_COLUMNS = 'workspace_id,store_id,id,username,name,role,enabled,pay_type,hourly_rate,fixed_salary,created_at,auth_uid';
+
+    function selectColsFor(table) {
+        return table === 'users' ? USERS_SAFE_COLUMNS : '*';
+    }
+
     // camelCase (app) → snake_case (column). Keys absent here pass through unchanged.
     const FIELD_MAP = {
         users: { authUid: 'auth_uid', payType: 'pay_type', hourlyRate: 'hourly_rate', fixedSalary: 'fixed_salary', createdAt: 'created_at', storeId: 'store_id' },
@@ -330,7 +343,7 @@ const DB = (() => {
         await Promise.all(TABLES.map(async (table) => {
             const { data, error } = await client
                 .from(table)
-                .select('*')
+                .select(selectColsFor(table))
                 .eq('workspace_id', workspaceId)
                 .eq('store_id', currentStoreId);
             if (error) throw error;
@@ -361,7 +374,7 @@ const DB = (() => {
         await Promise.all(TABLES.map(async (table) => {
             const { data, error } = await client
                 .from(table)
-                .select('*')
+                .select(selectColsFor(table))
                 .eq('workspace_id', workspaceId)
                 .eq('store_id', currentStoreId);
             if (error) throw error;
