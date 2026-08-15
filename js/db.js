@@ -165,6 +165,10 @@ const DB = (() => {
         cache[table] = (cache[table] || []).filter(r => r.storeId !== currentStoreId);
     }
 
+    function resetAll() {
+        TABLES.forEach(t => clear(t));
+    }
+
     // ── synchronous cache mutations (immediate UI) ───────────────
     function insert(table, row) {
         const now = new Date().toISOString();
@@ -454,6 +458,7 @@ const DB = (() => {
         query,
         count,
         clear,
+        resetAll,
         insert,
         update,
         remove,
