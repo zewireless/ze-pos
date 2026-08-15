@@ -33,7 +33,7 @@ const Lockout = (() => {
     const TIER1 = 6;                  // attempt count that triggers the first lockout
     const TIER1_MS = 1 * 60 * 1000;  // 1 minute
     const TIER2 = 10;                 // attempt count that triggers the long lockout
-    const TIER2_MS = 60 * 60 * 1000; // 1 hour
+    const TIER2_MS = 2 * 60 * 1000; // 1 hour
     const PREFIX = 'ze_lockout_';
 
     const _read = (ns) => {
