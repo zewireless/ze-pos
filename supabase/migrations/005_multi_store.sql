@@ -386,31 +386,47 @@ begin
                 and store_id = any(public.assigned_stores())
             );
 
-            -- Write: subscription active + (store admin OR owns_row for shifts/own user row)
+            -- Insert: any workspace member with an active subscription (cashiers included)
+            create policy "tenant_insert_%I"
+            on public.%I for insert
+            with check (
+                workspace_id = public.workspace_of()
+                and store_id = any(public.assigned_stores())
+                and public.workspace_subscription_active()
+            );
+
+            -- Update/Delete: store admin OR owns own row (shift/user)
             create policy "tenant_write_%I"
-            on public.%I for all
-            using (
+            on public.%I for update using (
                 workspace_id = public.workspace_of()
                 and store_id = any(public.assigned_stores())
                 and public.workspace_subscription_active()
                 and (
                     public.is_store_admin(store_id)
-                    or public.owns_row('%I', id)
+                    or public.owns_row(id)
                 )
-            )
-            with check (
+            );
+
+            create policy "tenant_delete_%I"
+            on public.%I for delete using (
                 workspace_id = public.workspace_of()
                 and store_id = any(public.assigned_stores())
                 and public.workspace_subscription_active()
-                and public.is_store_admin(store_id)
+                and (
+                    public.is_store_admin(store_id)
+                    or public.owns_row(id)
+                )
             );
-        $pol$, t, t, t);
+        $pol$, t, t, t, t, t, t);
     end loop;
 end $$;
 
 -- -------------------------------------------------------------
 -- 10. Update seed_workspace to create default store (or seed a specific store)
 -- -------------------------------------------------------------
+-- Must DROP first because CREATE OR REPLACE cannot change function arity.
+drop function if exists public.seed_workspace() cascade;
+
 create or replace function public.seed_workspace(p_store_id text default null)
 returns void
 language plpgsql
@@ -420,11 +436,19 @@ as $$
 declare
     v_ws uuid := public.workspace_of();
     v_store_id text := coalesce(p_store_id, 's1');
+    owner_name text;
 begin
+    select business_name into owner_name from public.profiles where id = v_ws;
+
     -- Create default store if missing
     insert into public.stores (workspace_id, id, name, created_at)
-    values (v_ws, v_store_id, 'Main Store', now())
+    values (v_ws, v_store_id, coalesce(owner_name, 'Main Store'), now())
     on conflict (workspace_id, id) do nothing;
+
+    -- Owner admin user (id = workspace id; auth_uid links to the owner account)
+    insert into public.users (workspace_id, store_id, id, username, name, role, enabled, pay_type, hourly_rate, fixed_salary, auth_uid)
+    values (v_ws, v_store_id, v_ws::text, coalesce((select email from auth.users where id = v_ws), 'owner'), coalesce(owner_name, 'Owner'), 'admin', true, 'hourly', 0, 0, v_ws)
+    on conflict (workspace_id, store_id, id) do nothing;
 
     -- Seed core tables scoped to that store
     -- settings
@@ -446,7 +470,7 @@ begin
 
     -- default tax row
     insert into public.taxes (workspace_id, store_id, id, name, percentage, enabled, created_at)
-    select v_ws, v_store_id, 'vat12', 'VAT 12%%', 12, true, now()
+    select v_ws, v_store_id, 'vat12', 'VAT 12%', 12, true, now()
     where not exists (select 1 from public.taxes where workspace_id = v_ws and store_id = v_store_id and id = 'vat12');
 
     -- default category
@@ -468,4 +492,4 @@ grant execute on function public.set_current_store(text) to anon, authenticated;
 grant execute on function public.current_store() to anon, authenticated;
 grant execute on function public.assigned_stores() to anon, authenticated;
 grant execute on function public.is_store_admin(text) to anon, authenticated;
-grant execute on function public.seed_workspace() to anon, authenticated;
+grant execute on function public.seed_workspace(text) to anon, authenticated;

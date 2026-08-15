@@ -27,7 +27,7 @@ begin
 
     if v_uid is null then
         raise exception
-            'No auth account found for %%. '
+            'No auth account found for %L. '
             'Create it in the Supabase Dashboard first '
             '(Authentication → Add User) then re-run this migration.', v_email;
     end if;

@@ -270,7 +270,7 @@ begin
         (ws, 'st1', 'restaurant_name', coalesce(owner_name, 'My Business')),
         (ws, 'st2', 'restaurant_address', ''),
         (ws, 'st3', 'restaurant_phone', ''),
-        (ws, 'st4', 'currency_symbol', '��'),
+        (ws, 'st4', 'currency_symbol', '₱'),
         (ws, 'st5', 'overtime_enabled', '0'),
         (ws, 'st6', 'overtime_daily_threshold', '8'),
         (ws, 'st7', 'overtime_weekly_threshold', '40'),

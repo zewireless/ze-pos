@@ -62,6 +62,19 @@ drop function if exists public.current_store() cascade;
 drop function if exists public.set_current_store(text) cascade;
 drop function if exists public.assigned_stores() cascade;
 drop function if exists public.is_store_admin(text) cascade;
+drop function if exists public.seed_workspace(text) cascade;
+
+-- 006 functions & tables (auth lockout)
+drop table if exists public.auth_lockout cascade;
+drop function if exists public.check_auth_lock(text, text) cascade;
+drop function if exists public.record_auth_failure(text, text) cascade;
+drop function if exists public.clear_auth_lock(text, text) cascade;
+drop function if exists public.cleanup_auth_lockout() cascade;
+
+-- 007 functions
+drop function if exists public.billing_log_webhook(uuid, text, jsonb) cascade;
+drop function if exists public.report_orders(timestamptz, timestamptz, text, text, integer, integer) cascade;
+drop function if exists public.report_shifts(timestamptz, timestamptz, text, text, integer, integer) cascade;
 
 -- Drop trigger on auth.users
 drop trigger if exists on_auth_user_created on auth.users;
