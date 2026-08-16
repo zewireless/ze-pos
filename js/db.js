@@ -1,5 +1,5 @@
 /**
- * DB – cloud-backed, local-first data layer with multi-store support.  
+ * DB – cloud-backed, local-first data layer with multi-store support.
  *
  * Keeps the exact synchronous API the app modules use
  * (getAll / getById / query / insert / update / remove / count / clear /
@@ -403,6 +403,10 @@ const DB = (() => {
     async function upsertStore(row) {
         const client = Supabase.getClient();
         const dbRow = toDb('stores', row);
+        delete dbRow.store_id; // 'stores' is not itself store-scoped — toDb() injects
+                                // store_id for every table, but public.stores has no
+                                // such column, which is exactly what caused the
+                                // "Could not find the 'store_id' column of 'stores'" error.
         const { data, error } = await client.from('stores').upsert(dbRow, { onConflict: 'workspace_id,id' }).select().single();
         if (error) throw error;
         // Also ensure seed for new store (pass the store ID so it gets defaults)
