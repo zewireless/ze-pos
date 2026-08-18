@@ -359,7 +359,14 @@ const DB = (() => {
     // Store context API
     function getCurrentStore() { return currentStoreId; }
     function getAssignedStores()
-    // Re-fetch assigned_stores() from the server (workspace admins get all
+   
+    
+    
+    { return [...assignedStoreIds]; }
+
+
+
+     // Re-fetch assigned_stores() from the server (workspace admins get all
 // stores implicitly, so this must be called after creating/deleting a
 // store or changing staff assignments — otherwise the cached list from
 // DB.init() goes stale and the switcher stays hidden even though the
@@ -377,9 +384,6 @@ async function refreshAssignedStores() {
     }
     return [...assignedStoreIds];
 }
-    
-    
-    { return [...assignedStoreIds]; }
 
     async function setCurrentStore(storeId) {
         if (!assignedStoreIds.includes(storeId)) {
