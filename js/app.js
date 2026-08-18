@@ -398,8 +398,9 @@ const App = (() => {
                 const nameInput = container.querySelector(`.store-name-input[data-id="${id}"]`);
                 const name = nameInput.value.trim();
                 if (!name) { toast('Store name required', 'error'); return; }
-                try {
+             try {
                     await DB.upsertStore({ id, name });
+                    await DB.refreshAssignedStores();
                     toast('Store saved');
                     renderStoreList();
                     renderStoreSwitcher();
@@ -415,8 +416,9 @@ const App = (() => {
                 const id = btn.dataset.id;
                 const yes = await App.confirm('Delete Store?', `Delete this store and all its data? This cannot be undone.`, 'Delete');
                 if (!yes) return;
-                try {
+                               try {
                     await DB.deleteStore(id);
+                    await DB.refreshAssignedStores();
                     toast('Store deleted');
                     renderStoreList();
                     renderStoreSwitcher();
@@ -431,8 +433,9 @@ const App = (() => {
             const name = prompt('New store name:');
             if (!name) return;
             const id = 's' + Date.now().toString(36);
-            try {
+                        try {
                 await DB.upsertStore({ id, name });
+                await DB.refreshAssignedStores();
                 toast('Store created');
                 renderStoreList();
                 renderStoreSwitcher();
@@ -481,12 +484,14 @@ const App = (() => {
             cb.addEventListener('change', async () => {
                 const userId = cb.dataset.user;
                 const storeId = cb.dataset.store;
-                try {
+                               try {
                     if (cb.checked) {
                         await DB.assignUserToStore(userId, storeId);
+                        await DB.refreshAssignedStores();
                         toast('Assigned');
                     } else {
                         await DB.unassignUserFromStore(userId, storeId);
+                        await DB.refreshAssignedStores();
                         toast('Unassigned');
                     }
                 } catch (err) {
