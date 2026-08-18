@@ -358,7 +358,28 @@ const DB = (() => {
 
     // Store context API
     function getCurrentStore() { return currentStoreId; }
-    function getAssignedStores() { return [...assignedStoreIds]; }
+    function getAssignedStores()
+    // Re-fetch assigned_stores() from the server (workspace admins get all
+// stores implicitly, so this must be called after creating/deleting a
+// store or changing staff assignments — otherwise the cached list from
+// DB.init() goes stale and the switcher stays hidden even though the
+// underlying data changed).
+async function refreshAssignedStores() {
+    const client = Supabase.getClient();
+    if (!client) return assignedStoreIds;
+    try {
+        const { data, error } = await client.rpc('assigned_stores');
+        if (!error && data) {
+            assignedStoreIds = data.length ? data : ['s1'];
+        }
+    } catch (e) {
+        console.warn('refreshAssignedStores:', e.message);
+    }
+    return [...assignedStoreIds];
+}
+    
+    
+    { return [...assignedStoreIds]; }
 
     async function setCurrentStore(storeId) {
         if (!assignedStoreIds.includes(storeId)) {
@@ -460,6 +481,7 @@ const DB = (() => {
         getWorkspaceId,
         getCurrentStore,
         getAssignedStores,
+        refreshAssignedStores,
         setCurrentStore,
         loadAllWorkspaceStores,
         upsertStore,
