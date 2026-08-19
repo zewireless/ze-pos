@@ -176,10 +176,29 @@ const App = (() => {
     }
 
     // Render the store switcher in header actions (only if user has >1 assigned store)
+    // Render the store switcher in header actions (only if user has >1 assigned store)
     async function renderStoreSwitcher() {
-        const container = $('#storeSwitcher');
-        const select = $('#storeSelect');
-        if (!container || !select) return;
+        const headerActions = $('#headerActions');
+        if (!headerActions) return;
+
+        // navigateTo() wipes #headerActions.innerHTML on every page change, so
+        // the static #storeSwitcher markup from app.html gets deleted along
+        // with it. Recreate it here instead of assuming it still exists.
+        let container = $('#storeSwitcher');
+        if (!container) {
+            container = document.createElement('div');
+            container.className = 'store-switcher';
+            container.id = 'storeSwitcher';
+            container.style.display = 'none';
+            container.innerHTML = `
+                <span class="store-switcher-label">🏪 Store</span>
+                <select id="storeSelect" class="form-control form-control-sm" title="Switch store">
+                    <option value="">Select Store…</option>
+                </select>
+            `;
+            headerActions.appendChild(container);
+        }
+        const select = $('#storeSelect', container);
 
         const assigned = DB.getAssignedStores();
         if (assigned.length <= 1) {
@@ -222,7 +241,8 @@ const App = (() => {
         ).join('');
         container.style.display = 'flex';
 
-        // Bind change event (only once)
+        // Bind change event (only once per element — a fresh element is
+        // created each nav, so this always re-binds cleanly, no duplicates)
         if (!select.dataset.bound) {
             select.addEventListener('change', async () => {
                 const storeId = select.value;
