@@ -674,6 +674,7 @@ const App = (() => {
     return {
         init,
         navigateTo,
+        refreshCurrentPage,
         openModal,
         closeModal,
         confirm,
