@@ -440,16 +440,23 @@ const Admin = (() => {
                     <div class="table-container">
                         <table>
                             <thead>
-                                <tr><th>Date</th><th>Amount</th><th>Method</th><th>Status</th><th>Ref</th></tr>
+                                <tr><th>Date</th><th>Plan</th><th>Amount</th><th>Method</th><th>Status</th><th>Ref</th><th></th></tr>
                             </thead>
                             <tbody>
                                 ${rows.map(p => `
                                     <tr>
                                         <td>${fmtDate(p.created_at)}</td>
+                                        <td class="text-muted">${App_escapeHtml(p.plan_name || '—')}</td>
                                         <td><strong>${p.amount}</strong></td>
                                         <td class="text-muted">${App_escapeHtml(p.method)}</td>
-                                        <td>${p.status === 'paid' ? '<span class="badge badge-success">Paid</span>' : '<span class="badge badge-warning">' + App_escapeHtml(p.status) + '</span>'}</td>
+                                        <td>${p.status === 'paid' ? '<span class="badge badge-success">Paid</span>' : p.status === 'pending' ? '<span class="badge badge-warning">Pending</span>' : '<span class="badge badge-danger">' + App_escapeHtml(p.status) + '</span>'}</td>
                                         <td class="text-muted">${App_escapeHtml(p.reference || '—')}</td>
+                                        <td>
+                                            ${p.status === 'pending' ? `
+                                                <button class="btn btn-success btn-sm" data-pay-action="approve" data-id="${p.id}">✓ Approve</button>
+                                                <button class="btn btn-outline btn-sm" data-pay-action="reject" data-id="${p.id}">✕ Reject</button>
+                                            ` : ''}
+                                        </td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -461,6 +468,25 @@ const Admin = (() => {
                 <button class="btn btn-outline" onclick="Admin.closeModal()">Close</button>
             </div>
         `);
+
+        document.querySelectorAll('[data-pay-action]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const { payAction, id: paymentId } = btn.dataset;
+                const c = Supabase.getClient();
+                if (payAction === 'approve') {
+                    const { error: approveErr } = await c.rpc('admin_approve_payment', { p_payment_id: paymentId });
+                    if (approveErr) { toast(approveErr.message || 'Could not approve', 'error'); return; }
+                    toast('Payment approved — client activated');
+                } else if (payAction === 'reject') {
+                    const reason = prompt('Reason for rejecting (optional):') || null;
+                    const { error: rejectErr } = await c.rpc('admin_reject_payment', { p_payment_id: paymentId, p_reason: reason });
+                    if (rejectErr) { toast(rejectErr.message || 'Could not reject', 'error'); return; }
+                    toast('Payment rejected');
+                }
+                closeModal();
+                load();
+            });
+        });
     }
 
     async function setStatus(id, status, message) {
