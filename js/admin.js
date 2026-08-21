@@ -52,11 +52,15 @@ const Admin = (() => {
         $('btnAdminLogout').addEventListener('click', () => Supabase.signOut().then(() => { window.location.href = 'index.html'; }));
         $('btnAdminRefresh').addEventListener('click', load);
         $('btnNewPlan').addEventListener('click', () => openPlanForm(null));
+        $('btnRefreshPending').addEventListener('click', loadPending);
+        $('btnNotifSettings').addEventListener('click', openNotificationSettings);
+        subscribeToPendingPayments();
         $('adminConfirmCancel').addEventListener('click', () => { $('adminConfirmBackdrop').classList.remove('show'); if (confirmResolve) confirmResolve(false); });
         $('adminConfirmOk').addEventListener('click', () => { $('adminConfirmBackdrop').classList.remove('show'); if (confirmResolve) confirmResolve(true); });
         $('adminModalBackdrop').addEventListener('click', (e) => { if (e.target === $('adminModalBackdrop')) closeModal(); });
 
         await load();
+        await loadPending();
     }
 
     // ── data ────────────────────────────────────────────────────
@@ -86,6 +90,150 @@ const Admin = (() => {
         cachedPlans = data || [];
         renderPlans(cachedPlans);
     }
+
+    // ── pending subscriptions (instant panel) ──────────────────
+    async function loadPending() {
+        const client = Supabase.getClient();
+        const { data, error } = await client.rpc('admin_list_pending_payments');
+        if (error) {
+            $('pendingList').innerHTML = `<div class="empty-state"><h3>Error</h3><p>${App_escapeHtml((error.message || error).toString())}</p></div>`;
+            return;
+        }
+        renderPending(data || []);
+    }
+
+    function renderPending(rows) {
+        const badge = $('pendingBadge');
+        if (rows.length) {
+            badge.textContent = rows.length;
+            badge.style.display = 'inline-block';
+        } else {
+            badge.style.display = 'none';
+        }
+
+        if (!rows.length) {
+            $('pendingList').innerHTML = '<div class="empty-state"><span class="icon">✅</span><h3>No pending subscriptions</h3><p>New submissions will show up here instantly.</p></div>';
+            return;
+        }
+
+        $('pendingList').innerHTML = `
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr><th>Business</th><th>Plan</th><th>Amount</th><th>Method</th><th>Ref</th><th>Submitted</th><th style="text-align:right;">Actions</th></tr>
+                    </thead>
+                    <tbody>
+                        ${rows.map(p => `
+                            <tr>
+                                <td><strong>${App_escapeHtml(p.business_name)}</strong><div class="shift-meta">${App_escapeHtml(p.email || '')}</div></td>
+                                <td>${App_escapeHtml(p.plan_name || '—')}</td>
+                                <td><strong>${p.amount}</strong></td>
+                                <td class="text-muted">${App_escapeHtml(p.method)}</td>
+                                <td class="text-muted">${App_escapeHtml(p.reference || '—')}</td>
+                                <td class="text-muted">${fmtDate(p.created_at)}</td>
+                                <td class="text-right">
+                                    <button class="btn btn-success btn-sm" data-pending-action="approve" data-id="${p.id}">✓ Approve</button>
+                                    <button class="btn btn-outline btn-sm" data-pending-action="reject" data-id="${p.id}">✕ Reject</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        $('pendingList').querySelectorAll('[data-pending-action]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const { pendingAction, id } = btn.dataset;
+                const client = Supabase.getClient();
+                if (pendingAction === 'approve') {
+                    const { error } = await client.rpc('admin_approve_payment', { p_payment_id: id });
+                    if (error) { toast(error.message || 'Could not approve', 'error'); return; }
+                    toast('Approved — client activated');
+                } else {
+                    const reason = prompt('Reason for rejecting (optional):') || null;
+                    const { error } = await client.rpc('admin_reject_payment', { p_payment_id: id, p_reason: reason });
+                    if (error) { toast(error.message || 'Could not reject', 'error'); return; }
+                    toast('Rejected');
+                }
+                loadPending();
+                load();
+            });
+        });
+    }
+
+    // Live updates: as soon as a client submits a new payment, this
+    // fires without any manual refresh (requires the payments_read_admin
+    // RLS policy from migration 010).
+    function subscribeToPendingPayments() {
+        const client = Supabase.getClient();
+        if (!client) return;
+        client
+            .channel('admin-pending-payments')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'payments' }, (payload) => {
+                if (payload.new && payload.new.status === 'pending') {
+                    toast('🔔 New subscription submitted!');
+                    loadPending();
+                }
+            })
+            .subscribe();
+    }
+
+        // ── notification settings ───────────────────────────────────
+    async function openNotificationSettings() {
+        const client = Supabase.getClient();
+        const { data, error } = await client.rpc('admin_get_notification_settings');
+        if (error) { toast(error.message || 'Could not load settings', 'error'); return; }
+        const s = (data && data[0]) || { enabled: false, notify_email: '', sender_email: '', has_api_key: false };
+
+        openModal(`
+            <div class="modal-header">
+                <h3>🔔 Notification Settings</h3>
+                <button class="modal-close" onclick="Admin.closeModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label><input type="checkbox" id="notifEnabled" ${s.enabled ? 'checked' : ''}> Email me when a client submits a payment</label>
+                </div>
+                <div class="form-group">
+                    <label>Notify Email</label>
+                    <input type="email" class="form-control" id="notifEmail" value="${App_escapeHtml(s.notify_email || '')}" placeholder="you@yourbusiness.com">
+                </div>
+                <div class="form-group">
+                    <label>Sender Email (must be verified in Brevo)</label>
+                    <input type="email" class="form-control" id="notifSender" value="${App_escapeHtml(s.sender_email || '')}" placeholder="noreply@yourbusiness.com">
+                </div>
+                <div class="form-group">
+                    <label>Brevo API Key ${s.has_api_key ? '<span class="badge badge-success" style="font-size:0.7rem;">Saved</span>' : ''}</label>
+                    <input type="password" class="form-control" id="notifApiKey" placeholder="${s.has_api_key ? 'Leave blank to keep current key' : 'Paste your Brevo API key'}">
+                    <small class="form-hint">Get this from Brevo → Settings → SMTP & API → API Keys (different from the SMTP key used for auth emails).</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="Admin.closeModal()">Cancel</button>
+                <button class="btn btn-success" id="notifSave">Save Settings</button>
+            </div>
+        `);
+
+        $('notifSave').addEventListener('click', async () => {
+            const enabled = $('notifEnabled').checked;
+            const notifyEmail = $('notifEmail').value.trim();
+            const senderEmail = $('notifSender').value.trim();
+            const apiKey = $('notifApiKey').value.trim();
+
+            if (enabled && !notifyEmail) { toast('Enter a notify email', 'error'); return; }
+
+            const c = Supabase.getClient();
+            const { error: saveErr } = await c.rpc('admin_set_notification_settings', {
+                p_enabled: enabled, p_notify_email: notifyEmail || null, p_sender_email: senderEmail || null,
+                p_api_key: apiKey || null,
+            });
+            if (saveErr) { toast(saveErr.message || 'Could not save settings', 'error'); return; }
+            closeModal();
+            toast('Notification settings saved');
+        });
+    }
+    
 
     function fmtDuration(p) {
         const map = { trial: 'Trial', days: 'Days', weeks: 'Weeks', months: 'Months', custom: 'Custom' };
