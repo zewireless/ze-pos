@@ -25,12 +25,24 @@
             <div class="admin-brand">🛠 ZE-POS <small>Admin Dashboard</small></div>
             <div class="admin-actions">
                 <span id="adminUser" class="text-muted"></span>
+                <button class="btn btn-outline btn-sm" id="btnNotifSettings">🔔 Notifications</button>
                 <a class="btn btn-outline btn-sm" href="app.html">Open POS</a>
                 <button class="btn btn-outline btn-sm" id="btnAdminLogout">Logout</button>
             </div>
         </div>
-
         <div id="adminStats" class="stats-grid"></div>
+
+        <div class="card" style="margin-top:20px;border:2px solid var(--warning, #f59e0b);" id="pendingCard">
+            <div class="card-header">
+                <h3>🔔 Pending Subscriptions <span id="pendingBadge" class="badge badge-warning" style="display:none;"></span></h3>
+                <button class="btn btn-outline btn-sm" id="btnRefreshPending">↻ Refresh</button>
+            </div>
+            <div class="card-body" style="padding:0;">
+                <div id="pendingList">
+                    <div class="empty-state"><span class="icon">⏳</span><h3>Loading…</h3></div>
+                </div>
+            </div>
+        </div>
 
         <div class="card" style="margin-top:20px;">
             <div class="card-header">
