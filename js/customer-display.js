@@ -92,15 +92,20 @@ const CustomerDisplay = (() => {
     }
 
     async function loadStoreName() {
+        if (!storeId) {
+            if (elements.storeName) elements.storeName.textContent = 'No store selected';
+            return;
+        }
         try {
             const client = Supabase.getClient();
-            const { data } = await client.from('stores').select('name').eq('id', storeId).single();
+            const { data, error } = await client.from('stores').select('name').eq('id', storeId).single();
+            if (error) throw error;
             if (data && elements.storeName) {
                 elements.storeName.textContent = data.name;
             }
         } catch (e) {
             console.warn('[CustomerDisplay] Could not load store name:', e.message);
-            elements.storeName.textContent = 'Store #' + storeId.slice(-6);
+            if (elements.storeName) elements.storeName.textContent = 'Store #' + storeId.slice(-6);
         }
     }
 
@@ -137,12 +142,34 @@ const CustomerDisplay = (() => {
                     try { localStorage.removeItem(`cd_order_${storeId}`); } catch (e) { /* ignore */ }
                     showEmptyState();
                 })
-                .subscribe((status) => {
-                    console.log('[CustomerDisplay] Realtime subscription status:', status);
-                    updateConnectionStatus(status === 'SUBSCRIBED' ? 'connected' : 'connecting');
+                .subscribe((status, err) => {
+                    console.log('[CustomerDisplay] Realtime subscription status:', status, err || '');
+                    if (status === 'SUBSCRIBED') {
+                        updateConnectionStatus('connected');
+                    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                        // Give up on Realtime for now instead of hanging on
+                        // "Connecting..." forever — localStorage polling (already
+                        // running via startPolling) keeps same-device sync alive.
+                        console.warn('[CustomerDisplay] Realtime connection failed:', status, err && err.message);
+                        syncMethod = 'localStorage';
+                        updateConnectionStatus('localStorage');
+                    } else {
+                        updateConnectionStatus('connecting');
+                    }
                 });
 
             syncMethod = 'realtime';
+
+            // Safety net: if we never hear back at all (no SUBSCRIBED, no
+            // error status — e.g. Realtime traffic is blocked outright),
+            // don't leave the UI stuck on "Connecting..." forever.
+            setTimeout(() => {
+                if (syncMethod === 'realtime' && elements.connectionText && elements.connectionText.textContent === 'Connecting...') {
+                    console.warn('[CustomerDisplay] Realtime never confirmed a connection after 6s — falling back to local sync.');
+                    syncMethod = 'localStorage';
+                    updateConnectionStatus('localStorage');
+                }
+            }, 6000);
         } catch (e) {
             console.warn('[CustomerDisplay] Realtime not available, using localStorage:', e.message);
             syncMethod = 'localStorage';
