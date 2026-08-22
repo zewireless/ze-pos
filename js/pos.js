@@ -6,8 +6,337 @@ const POS = (() => {
     let activeCategory = '';
     let searchQuery = '';
     let orderType = 'Dine-In';
+    let selectedCartIndex = -1; // For keyboard navigation
+    let keyboardHandlerAttached = false;
+    let favorites = []; // Array of menu item IDs
+    const FAVORITES_KEY = 'ze-pos-favorites';
+
+    // ── Keyboard Shortcuts ────────────────────────────────────────
+    function initKeyboardShortcuts() {
+        if (keyboardHandlerAttached) return;
+        keyboardHandlerAttached = true;
+
+        document.addEventListener('keydown', handleKeyDown);
+    }
+
+    function destroyKeyboardShortcuts() {
+        if (!keyboardHandlerAttached) return;
+        keyboardHandlerAttached = false;
+        document.removeEventListener('keydown', handleKeyDown);
+    }
+
+    function handleKeyDown(e) {
+        // Only handle shortcuts when POS is visible and no modal/input is focused
+        const posEl = document.getElementById('page-pos');
+        if (!posEl || posEl.offsetParent === null) return;
+
+        const activeEl = document.activeElement;
+        const isInputFocused = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT' || activeEl.isContentEditable);
+        const isModalOpen = document.querySelector('.modal-backdrop:not(.hidden)') || document.querySelector('.modal-backdrop.confirm-dialog:not(.hidden)');
+
+        // Global shortcuts that work even with input focus
+        if (e.key === 'F1' || (e.key === '?' && e.shiftKey)) {
+            e.preventDefault();
+            showKeyboardHelp();
+            return;
+        }
+
+        if (isInputFocused || isModalOpen) {
+            // In modal/input: only allow Escape to close
+            if (e.key === 'Escape') {
+                if (isModalOpen) App.closeModal();
+            }
+            return;
+        }
+
+        // POS-specific shortcuts
+        switch (e.key) {
+            case 'Enter':
+                e.preventDefault();
+                if (cart.length > 0) completeOrder();
+                break;
+
+            case 'Escape':
+                e.preventDefault();
+                if (selectedCartIndex >= 0) {
+                    clearCartSelection();
+                } else if (cart.length > 0) {
+                    clearCart();
+                }
+                break;
+
+            case 'Backspace':
+            case 'Delete':
+                e.preventDefault();
+                if (selectedCartIndex >= 0) {
+                    removeCartItem(selectedCartIndex);
+                } else if (cart.length > 0) {
+                    removeCartItem(cart.length - 1);
+                }
+                break;
+
+            case 'ArrowUp':
+                e.preventDefault();
+                navigateCart(-1);
+                break;
+
+            case 'ArrowDown':
+                e.preventDefault();
+                navigateCart(1);
+                break;
+
+            case 'ArrowLeft':
+                e.preventDefault();
+                adjustQuantity(-1);
+                break;
+
+            case 'ArrowRight':
+                e.preventDefault();
+                adjustQuantity(1);
+                break;
+
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+                // Numpad or number row: set quantity for selected item
+                if (selectedCartIndex >= 0) {
+                    e.preventDefault();
+                    setQuantity(parseInt(e.key));
+                }
+                break;
+
+            case '0':
+                if (selectedCartIndex >= 0) {
+                    e.preventDefault();
+                    setQuantity(10);
+                }
+                break;
+
+            case '+':
+            case '=':
+                e.preventDefault();
+                adjustQuantity(1);
+                break;
+
+            case '-':
+            case '_':
+                e.preventDefault();
+                adjustQuantity(-1);
+                break;
+
+            case 'c':
+            case 'C':
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    clearCart();
+                }
+                break;
+
+            case 'd':
+            case 'D':
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    toggleOrderType();
+                }
+                break;
+
+            case 's':
+            case 'S':
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    focusSearch();
+                }
+                break;
+
+            default:
+                // Numpad keys (when NumLock is on)
+                if (e.key >= '0' && e.key <= '9' && e.location === KeyboardEvent.DOM_KEY_LOCATION_NUMPAD) {
+                    if (selectedCartIndex >= 0) {
+                        e.preventDefault();
+                        setQuantity(parseInt(e.key));
+                    }
+                }
+        }
+    }
+
+    function showKeyboardHelp() {
+        App.openModal(`
+            <div class="modal-header">
+                <h3>⌨ Keyboard Shortcuts</h3>
+                <button class="modal-close" onclick="App.closeModal()">✕</button>
+            </div>
+            <div class="modal-body" style="max-height:70vh;overflow:auto;">
+                <table class="shortcut-table" style="width:100%;border-collapse:collapse;font-size:0.9rem;">
+                    <thead>
+                        <tr style="border-bottom:2px solid var(--border);text-align:left;">
+                            <th style="padding:8px 12px;color:var(--text-muted);font-weight:600;">Key</th>
+                            <th style="padding:8px 12px;color:var(--text-muted);font-weight:600;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td style="padding:8px 12px;"><kbd style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-family:monospace;">Enter</kbd></td><td style="padding:8px 12px;">Complete Order</td></tr>
+                        <tr><td style="padding:8px 12px;"><kbd style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-family:monospace;">Escape</kbd></td><td style="padding:8px 12px;">Clear Selection / Clear Cart</td></tr>
+                        <tr><td style="padding:8px 12px;"><kbd style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-family:monospace;">↑ ↓</kbd></td><td style="padding:8px 12px;">Navigate Cart Items</td></tr>
+                        <tr><td style="padding:8px 12px;"><kbd style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-family:monospace;">← →</kbd></td><td style="padding:8px 12px;">Decrease / Increase Quantity</td></tr>
+                        <tr><td style="padding:8px 12px;"><kbd style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-family:monospace;">1-9, 0</kbd></td><td style="padding:8px 12px;">Set Quantity (1-10) for Selected Item</td></tr>
+                        <tr><td style="padding:8px 12px;"><kbd style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-family:monospace;">+ / -</kbd></td><td style="padding:8px 12px;">Increase / Decrease Quantity</td></tr>
+                        <tr><td style="padding:8px 12px;"><kbd style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-family:monospace;">Backspace / Delete</kbd></td><td style="padding:8px 12px;">Remove Selected/Last Item</td></tr>
+                        <tr><td style="padding:8px 12px;"><kbd style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-family:monospace;">Ctrl+C</kbd></td><td style="padding:8px 12px;">Clear Cart</td></tr>
+                        <tr><td style="padding:8px 12px;"><kbd style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-family:monospace;">Ctrl+D</kbd></td><td style="padding:8px 12px;">Toggle Order Type (Dine-In/Takeaway/Delivery)</td></tr>
+                        <tr><td style="padding:8px 12px;"><kbd style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-family:monospace;">Ctrl+S</kbd></td><td style="padding:8px 12px;">Focus Search</td></tr>
+                        <tr><td style="padding:8px 12px;"><kbd style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-family:monospace;">? / Shift+/</kbd></td><td style="padding:8px 12px;">Show This Help</td></tr>
+                    </tbody>
+                </table>
+                <p style="margin-top:16px;color:var(--text-muted);font-size:0.85rem;">
+                    <strong>Tip:</strong> Click any cart item to select it, then use number keys to quickly set quantity.
+                    Works with both number row and numpad.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="App.closeModal()">Got it</button>
+            </div>
+        `);
+    }
+
+    function navigateCart(direction) {
+        if (cart.length === 0) return;
+        selectedCartIndex = Math.max(0, Math.min(cart.length - 1, selectedCartIndex + direction));
+        updateCartSelection();
+    }
+
+    function adjustQuantity(delta) {
+        if (selectedCartIndex < 0 || selectedCartIndex >= cart.length) return;
+        cart[selectedCartIndex].quantity = Math.max(1, cart[selectedCartIndex].quantity + delta);
+        cart[selectedCartIndex].lineTotal = cart[selectedCartIndex].unitPrice * cart[selectedCartIndex].quantity;
+        updateCart();
+    }
+
+    function setQuantity(qty) {
+        if (selectedCartIndex < 0 || selectedCartIndex >= cart.length) return;
+        cart[selectedCartIndex].quantity = Math.max(1, Math.min(99, qty));
+        cart[selectedCartIndex].lineTotal = cart[selectedCartIndex].unitPrice * cart[selectedCartIndex].quantity;
+        updateCart();
+    }
+
+    function removeCartItem(idx) {
+        if (idx < 0 || idx >= cart.length) return;
+        cart.splice(idx, 1);
+        selectedCartIndex = Math.min(selectedCartIndex, cart.length - 1);
+        updateCart();
+    }
+
+    function clearCartSelection() {
+        selectedCartIndex = -1;
+        updateCartSelection();
+    }
+
+    function clearCart() {
+        cart = [];
+        selectedCartIndex = -1;
+        updateCart();
+    }
+
+    function toggleOrderType() {
+        const types = ['Dine-In', 'Takeaway', 'Delivery'];
+        const currentIdx = types.indexOf(orderType);
+        orderType = types[(currentIdx + 1) % types.length];
+        render(); // Re-render to update active button
+    }
+
+    function focusSearch() {
+        const searchInput = document.getElementById('posSearch');
+        if (searchInput) searchInput.focus();
+    }
+
+    function updateCartSelection() {
+        document.querySelectorAll('.pos-cart-item').forEach((el, idx) => {
+            el.classList.toggle('selected', idx === selectedCartIndex);
+        });
+    }
+
+    // ── Favorites Management ──────────────────────────────────────
+    function loadFavorites() {
+        try {
+            const stored = localStorage.getItem(FAVORITES_KEY);
+            favorites = stored ? JSON.parse(stored) : [];
+        } catch {
+            favorites = [];
+        }
+    }
+
+    function saveFavorites() {
+        localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+    }
+
+    function toggleFavorite(itemId) {
+        const idx = favorites.indexOf(itemId);
+        if (idx >= 0) {
+            favorites.splice(idx, 1);
+        } else if (favorites.length < 10) {
+            favorites.push(itemId);
+        } else {
+            App.toast('Maximum 10 favorites allowed', 'warning');
+            return false;
+        }
+        saveFavorites();
+        return true;
+    }
+
+    function isFavorite(itemId) {
+        return favorites.includes(itemId);
+    }
+
+    function getFavoriteItems() {
+        return favorites.map(id => DB.getById('menu_items', id)).filter(Boolean);
+    }
+
+    function renderFavoritesBar() {
+        const favItems = getFavoriteItems();
+        if (favItems.length === 0) {
+            return `
+                <div class="pos-favorites-bar empty">
+                    <span class="pos-favorites-label">★ Favorites</span>
+                    <button class="btn btn-ghost btn-sm pos-add-favorite-hint" data-action="show-favorites-help">
+                        Click ★ on any item to pin it here (max 10)
+                    </button>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="pos-favorites-bar">
+                <span class="pos-favorites-label">★ Favorites</span>
+                <div class="pos-favorites-items">
+                    ${favItems.map(item => {
+                        const sizes = DB.query('menu_sizes', s => s.menuItemId === item.id);
+                        const minPrice = sizes.length ? Math.min(...sizes.map(s => parseFloat(s.price) || 0)) : 0;
+                        return `
+                            <button class="pos-favorite-item" data-item-id="${item.id}" title="${App.escapeHtml(item.name)} - ${App.formatCurrency(minPrice)}">
+                                <span class="pos-favorite-img">
+                                    ${App.safeImageUrl(item.image)
+                                        ? `<img src="${App.safeImageUrl(item.image)}" alt="${App.escapeHtml(item.name)}">`
+                                        : '🍽'
+                                    }
+                                </span>
+                                <span class="pos-favorite-name">${App.escapeHtml(item.name)}</span>
+                                <span class="pos-favorite-price">${App.formatCurrency(minPrice)}</span>
+                                <button class="pos-favorite-remove" data-remove-fav="${item.id}" title="Remove from favorites" tabindex="-1">✕</button>
+                            </button>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    }
 
     function render() {
+        loadFavorites();
         const el = document.getElementById('page-pos');
         const user = Auth.currentUser();
         const openShift = Shifts.getOpenShift(user.id);
@@ -45,6 +374,7 @@ const POS = (() => {
                     <div class="pos-search-bar">
                         <input type="text" id="posSearch" placeholder="Search menu items..." value="${App.escapeHtml(searchQuery)}">
                     </div>
+                    ${renderFavoritesBar()}
                     <div class="pos-product-grid" id="posProductGrid">
                         ${items.length === 0
                             ? '<div class="empty-state" style="grid-column:1/-1;"><span class="icon">🔍</span><h3>No items found</h3><p>Try a different search or category.</p></div>'
@@ -74,28 +404,54 @@ const POS = (() => {
                         <div class="pos-totals" id="posTotals">
                             ${renderTotals()}
                         </div>
-                        <button class="btn-complete-order" id="btnCompleteOrder" ${cart.length === 0 ? 'disabled' : ''}>
-                            Complete Order
-                        </button>
+                        <div style="display:flex;gap:8px;">
+                            <button class="btn-split-bill" id="btnSplitBill" ${cart.length < 2 ? 'disabled' : ''} title="Split into multiple bills">
+                                ✂️ Split
+                            </button>
+                            <button class="btn-complete-order" id="btnCompleteOrder" ${cart.length === 0 ? 'disabled' : ''}>
+                                Complete Order
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
         `;
 
         bindEvents();
+        initKeyboardShortcuts();
     }
 
     // ── Shift Bar ──────────────────────────────────────────────
     function renderShiftBar(openShift, orderCount, totalSales) {
         if (openShift) {
+            const user = Auth.currentUser();
+            const activeBreak = Shifts.getActiveBreak(openShift.id).find(b => b.userId === user.id);
+            const allBreaks = Shifts.getShiftBreaks(openShift.id).filter(b => b.userId === user.id);
+            const totalBreakMins = allBreaks.reduce((sum, b) => sum + (b.durationMinutes || 0), 0);
+
             return `
                 <div class="shift-status-bar active">
                     <div class="shift-status-info">
                         <span class="badge badge-success" style="font-size:0.8rem;">● Shift Active</span>
                         <span>Started <strong>${App.formatDateTime(openShift.startTime)}</strong></span>
                         <span class="shift-meta">${orderCount} order${orderCount !== 1 ? 's' : ''} · ${App.formatCurrency(totalSales)}</span>
+                        <span class="shift-meta break-meta">
+                            ${activeBreak
+                                ? `<span class="break-active-indicator">⏸ On ${activeBreak.breakType} break</span>`
+                                : `<span>Break: ${Shifts.formatBreakDuration(totalBreakMins)}</span>`
+                            }
+                        </span>
                     </div>
-                    <button class="btn btn-danger btn-sm" data-action="pos-end-shift">End Shift</button>
+                    <div class="shift-actions">
+                        ${activeBreak
+                            ? `<button class="btn btn-danger btn-sm" data-action="pos-end-break" data-break-id="${activeBreak.id}">End Break</button>`
+                            : `
+                                <button class="btn btn-outline btn-sm" data-action="pos-start-break" data-type="rest">☕ Rest</button>
+                                <button class="btn btn-outline btn-sm" data-action="pos-start-break" data-type="meal">🍽 Meal</button>
+                            `}
+                        <button class="btn btn-outline btn-sm" data-action="pos-shift-notes">📝 Notes</button>
+                        <button class="btn btn-danger btn-sm" data-action="pos-end-shift">End Shift</button>
+                    </div>
                 </div>
             `;
         }
@@ -241,6 +597,11 @@ const POS = (() => {
 
         const orders = DB.query('orders', o => o.shiftId === openShift.id);
         const totalSales = orders.reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
+        const activeBreak = Shifts.getActiveBreak(openShift.id).find(b => b.userId === user.id);
+
+        // Calculate break time
+        const allBreaks = Shifts.getShiftBreaks(openShift.id).filter(b => b.userId === user.id);
+        const totalBreakMins = allBreaks.reduce((sum, b) => sum + (b.durationMinutes || 0), 0);
 
         App.openModal(`
             <div class="modal-header">
@@ -263,6 +624,13 @@ const POS = (() => {
                             <div class="stat-value">${App.formatCurrency(totalSales)}</div>
                         </div>
                     </div>
+                    <div class="stat-card">
+                        <div class="stat-icon orange">⏱</div>
+                        <div class="stat-info">
+                            <div class="stat-label">Break Time</div>
+                            <div class="stat-value">${Shifts.formatBreakDuration(totalBreakMins)}</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Starting Cash Float</label>
@@ -274,6 +642,19 @@ const POS = (() => {
                            placeholder="Enter the counted cash amount">
                     <small class="form-hint">Optional — skip if you don't want to reconcile cash.</small>
                 </div>
+                <div class="form-group">
+                    <label>Shift Notes (for your records)</label>
+                    <textarea class="form-control" id="posShiftNotes" rows="2" placeholder="Any notes about this shift...">${App.escapeHtml(openShift.notes || '')}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Handover Notes (for next cashier & admins)</label>
+                    <textarea class="form-control" id="posHandoverNotes" rows="2" placeholder="Important info for the next shift...">${App.escapeHtml(openShift.handover_notes || '')}</textarea>
+                </div>
+                ${activeBreak ? `
+                    <div class="alert alert-warning" style="margin-top:12px;padding:12px;background:#fff7ed;border:1px solid #fde68a;border-radius:var(--radius);color:#92400e;">
+                        ⚠️ <strong>Active Break:</strong> You have a ${activeBreak.breakType} break in progress. It will be auto-ended when you end your shift.
+                    </div>
+                ` : ''}
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline" onclick="App.closeModal()">Cancel</button>
@@ -284,8 +665,15 @@ const POS = (() => {
         document.getElementById('btnConfirmPosEndShift').addEventListener('click', () => {
             const endingCashVal = document.getElementById('posEndingCashInput').value;
             const endingCash = endingCashVal !== '' ? parseFloat(endingCashVal) : null;
+            const notes = document.getElementById('posShiftNotes')?.value || '';
+            const handoverNotes = document.getElementById('posHandoverNotes')?.value || '';
 
-            Shifts.endShift(openShift.id, endingCash);
+            // End any active break first
+            if (activeBreak) {
+                Shifts.endBreak(activeBreak.id);
+            }
+
+            Shifts.endShift(openShift.id, endingCash, notes, handoverNotes);
             App.closeModal();
             App.toast('Shift ended');
             render();
@@ -310,6 +698,7 @@ const POS = (() => {
         const sizes = DB.query('menu_sizes', s => s.menuItemId === item.id);
         const minPrice = sizes.length ? Math.min(...sizes.map(s => parseFloat(s.price) || 0)) : 0;
         const category = DB.getById('categories', item.categoryId);
+        const fav = isFavorite(item.id);
 
         return `
             <div class="pos-product-card" data-item-id="${item.id}">
@@ -318,6 +707,9 @@ const POS = (() => {
                         ? `<img src="${App.safeImageUrl(item.image)}" alt="${App.escapeHtml(item.name)}">`
                         : '🍽'
                     }
+                    <button class="pos-favorite-toggle ${fav ? 'active' : ''}" data-fav="${item.id}" title="${fav ? 'Remove from favorites' : 'Add to favorites'}" tabindex="-1">
+                        ${fav ? '★' : '☆'}
+                    </button>
                 </div>
                 <div class="pos-product-name" title="${App.escapeHtml(item.name)}">${App.escapeHtml(item.name)}</div>
                 <div class="pos-product-price">${App.formatCurrency(minPrice)}</div>
@@ -331,8 +723,10 @@ const POS = (() => {
             ? item.condiments.map(c => c.name).join(', ')
             : '';
 
+        const isSelected = idx === selectedCartIndex;
+
         return `
-            <div class="pos-cart-item">
+            <div class="pos-cart-item ${isSelected ? 'selected' : ''}" data-cart-idx="${idx}" tabindex="0" role="button" aria-label="${App.escapeHtml(item.name)}, quantity ${item.quantity}, ${App.formatCurrency(item.lineTotal)}">
                 <div class="pos-cart-item-header">
                     <div>
                         <div class="pos-cart-item-name">${App.escapeHtml(item.name)}</div>
@@ -344,13 +738,13 @@ const POS = (() => {
                     </div>
                     <div style="display:flex;align-items:center;gap:8px;">
                         <span class="pos-cart-item-price">${App.formatCurrency(item.lineTotal)}</span>
-                        <button class="pos-cart-item-remove" data-remove="${idx}" title="Remove">✕</button>
+                        <button class="pos-cart-item-remove" data-remove="${idx}" title="Remove" tabindex="-1">✕</button>
                     </div>
                 </div>
                 <div class="pos-cart-item-controls">
-                    <button class="btn-icon btn-sm" data-qty="-1" data-idx="${idx}">−</button>
+                    <button class="btn-icon btn-sm" data-qty="-1" data-idx="${idx}" tabindex="-1">−</button>
                     <span class="qty">${item.quantity}</span>
-                    <button class="btn-icon btn-sm" data-qty="1" data-idx="${idx}">+</button>
+                    <button class="btn-icon btn-sm" data-qty="1" data-idx="${idx}" tabindex="-1">+</button>
                 </div>
             </div>
         `;
@@ -528,12 +922,66 @@ const POS = (() => {
         }
         if (totalsEl) totalsEl.innerHTML = renderTotals();
         if (completeBtn) completeBtn.disabled = cart.length === 0;
+        updateCartSelection();
+
+        // Sync to customer display
+        syncCustomerDisplay();
+    }
+
+    // ── Customer Display Sync ─────────────────────────────────────
+    function syncCustomerDisplay() {
+        const storeId = DB.getCurrentStore();
+        if (!storeId) return;
+
+        const subtotal = cart.reduce((sum, item) => sum + item.lineTotal, 0);
+        const taxInfo = getActiveTax();
+        const taxAmount = taxInfo.enabled ? subtotal * taxInfo.percentage / 100 : 0;
+        const total = subtotal + taxAmount;
+
+        const orderData = {
+            orderNumber: 'Current Order',
+            type: orderType,
+            status: cart.length > 0 ? 'Pending' : 'Completed',
+            subtotal,
+            taxName: taxInfo.name,
+            taxPercentage: taxInfo.percentage,
+            taxAmount,
+            total,
+            items: cart.map(item => ({
+                name: item.name,
+                size: item.size,
+                quantity: item.quantity,
+                condiments: item.condiments,
+                notes: item.notes,
+                lineTotal: item.lineTotal,
+                unitPrice: item.unitPrice,
+            })),
+            timestamp: Date.now(),
+        };
+
+        try {
+            localStorage.setItem(`cd_order_${storeId}`, JSON.stringify(orderData));
+        } catch (e) {
+            console.warn('[POS] Failed to sync to customer display:', e.message);
+        }
     }
 
     function bindCartEvents() {
+        // Cart item click for selection
+        document.querySelectorAll('.pos-cart-item[data-cart-idx]').forEach(itemEl => {
+            itemEl.addEventListener('click', (e) => {
+                // Don't select if clicking on buttons
+                if (e.target.closest('button')) return;
+                const idx = parseInt(itemEl.dataset.cartIdx);
+                selectedCartIndex = idx === selectedCartIndex ? -1 : idx;
+                updateCartSelection();
+            });
+        });
+
         // Quantity buttons
         document.querySelectorAll('[data-qty]').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
                 const idx = parseInt(btn.dataset.idx);
                 const delta = parseInt(btn.dataset.qty);
                 cart[idx].quantity = Math.max(1, cart[idx].quantity + delta);
@@ -544,9 +992,11 @@ const POS = (() => {
 
         // Remove buttons
         document.querySelectorAll('[data-remove]').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
                 const idx = parseInt(btn.dataset.remove);
                 cart.splice(idx, 1);
+                selectedCartIndex = Math.min(selectedCartIndex, cart.length - 1);
                 updateCart();
             });
         });
@@ -599,6 +1049,9 @@ const POS = (() => {
             });
         });
 
+        // Show completed status on customer display
+        showCompletedOnCustomerDisplay(orderNumber, total);
+
         // Show receipt
         Receipt.show(order);
 
@@ -608,14 +1061,268 @@ const POS = (() => {
         App.toast(`Order #${orderNumber} completed!`);
     }
 
+    // ── Split Bill ─────────────────────────────────────────────
+    function openSplitBillModal() {
+        if (cart.length === 0) {
+            App.toast('Cart is empty', 'error');
+            return;
+        }
+
+        const subtotal = cart.reduce((sum, item) => sum + item.lineTotal, 0);
+        const taxInfo = getActiveTax();
+        const taxAmount = taxInfo.enabled ? subtotal * taxInfo.percentage / 100 : 0;
+        const total = subtotal + taxAmount;
+
+        App.openModal(`
+            <div class="modal-header">
+                <h3>✂️ Split Bill</h3>
+                <button class="modal-close" onclick="App.closeModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted" style="margin-bottom:16px;">Divide items into separate bills. Click items to assign them to each split.</p>
+
+                <div style="margin-bottom:16px;padding:12px;background:var(--bg);border-radius:8px;">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                        <span><strong>Current Total:</strong></span>
+                        <span><strong>${App.formatCurrency(total)}</strong></span>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <span class="badge badge-info">Subtotal: ${App.formatCurrency(subtotal)}</span>
+                        ${taxInfo.enabled ? `<span class="badge badge-gray">${taxInfo.name}: ${App.formatCurrency(taxAmount)}</span>` : ''}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Number of Splits</label>
+                    <select class="form-control" id="splitCount" style="width:120px;">
+                        <option value="2">2 Bills</option>
+                        <option value="3">3 Bills</option>
+                        <option value="4">4 Bills</option>
+                        <option value="5">5 Bills</option>
+                    </select>
+                </div>
+
+                <h4 style="margin:16px 0 12px;">Assign Items to Each Split</h4>
+                <div id="splitBillsContainer"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="App.closeModal()">Cancel</button>
+                <button class="btn btn-primary" id="btnConfirmSplit">Confirm & Pay</button>
+            </div>
+        `);
+
+        document.getElementById('splitCount').addEventListener('change', (e) => {
+            renderSplitBills(parseInt(e.target.value));
+        });
+
+        renderSplitBills(2);
+
+        document.getElementById('btnConfirmSplit').addEventListener('click', () => {
+            confirmSplitBill();
+        });
+    }
+
+    function renderSplitBills(numSplits) {
+        const container = document.getElementById('splitBillsContainer');
+        if (!container) return;
+
+        // Initialize assignments if not exists
+        if (!window.splitBillAssignments || window.splitBillAssignments.length !== cart.length) {
+            window.splitBillAssignments = cart.map(() => 0); // 0 = unassigned
+        }
+
+        const taxInfo = getActiveTax();
+
+        let html = '';
+        for (let i = 0; i < numSplits; i++) {
+            const assignedItems = cart.filter((item, idx) => window.splitBillAssignments[idx] === i + 1);
+            const splitSubtotal = assignedItems.reduce((sum, item) => sum + item.lineTotal, 0);
+            const splitTax = taxInfo.enabled ? splitSubtotal * taxInfo.percentage / 100 : 0;
+            const splitTotal = splitSubtotal + splitTax;
+
+            html += `
+                <div class="split-bill-card" style="margin-bottom:16px;padding:12px;border:1px solid var(--border);border-radius:8px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                        <h5 style="margin:0;">Split ${i + 1}</h5>
+                        <span style="font-weight:700;color:var(--primary);">${App.formatCurrency(splitTotal)}</span>
+                    </div>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;min-height:40px;padding:8px;background:var(--bg);border-radius:4px;">
+                        ${assignedItems.length > 0
+                            ? assignedItems.map((item, idx) => {
+                                const cartIdx = cart.findIndex(c => c === item);
+                                return `<span class="badge badge-primary" style="cursor:pointer;" data-split="${i + 1}" data-cart-idx="${cartIdx}">${App.escapeHtml(item.name)} (${item.quantity}x) - ${App.formatCurrency(item.lineTotal)}</span>`;
+                            }).join('')
+                            : '<span class="text-muted" style="font-size:0.85rem;">Click items below to assign to this split</span>'
+                        }
+                    </div>
+                </div>
+            `;
+        }
+
+        // Unassigned items section
+        const unassignedItems = cart.filter((item, idx) => window.splitBillAssignments[idx] === 0);
+        html += `
+            <div style="margin-top:16px;padding:12px;background:#fff7ed;border:1px solid #fde68a;border-radius:8px;">
+                <h5 style="margin:0 0 8px;color:#92400e;">Unassigned Items</h5>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                    ${unassignedItems.map((item, idx) => {
+                        const cartIdx = cart.findIndex(c => c === item);
+                        return `<span class="badge badge-warning" style="cursor:pointer;" data-split="0" data-cart-idx="${cartIdx}">${App.escapeHtml(item.name)} (${item.quantity}x) - ${App.formatCurrency(item.lineTotal)}</span>`;
+                    }).join('') || '<span class="text-muted" style="font-size:0.85rem;">All items assigned ✓</span>'}
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = html;
+
+        // Bind click events to reassign items
+        container.querySelectorAll('[data-cart-idx]').forEach(badge => {
+            badge.addEventListener('click', () => {
+                const cartIdx = parseInt(badge.dataset.cartIdx);
+                const currentSplit = window.splitBillAssignments[cartIdx];
+                const numSplits = parseInt(document.getElementById('splitCount').value);
+                // Cycle through splits: 0 -> 1 -> 2 -> ... -> numSplits -> 0
+                const newSplit = (currentSplit + 1) % (numSplits + 1);
+                window.splitBillAssignments[cartIdx] = newSplit;
+                renderSplitBills(numSplits);
+            });
+        });
+    }
+
+    async function confirmSplitBill() {
+        const numSplits = parseInt(document.getElementById('splitCount').value);
+        const user = Auth.currentUser();
+        const openShift = Shifts.getOpenShift(user.id);
+
+        if (user.role === 'cashier' && !openShift) {
+            App.toast('Start your shift before taking orders', 'error');
+            return;
+        }
+
+        // Check all items are assigned
+        const unassigned = window.splitBillAssignments.filter(a => a === 0).length;
+        if (unassigned > 0) {
+            App.toast(`${unassigned} item(s) not assigned to any split`, 'error');
+            return;
+        }
+
+        const taxInfo = getActiveTax();
+
+        // Create orders for each split
+        const createdOrders = [];
+        for (let i = 0; i < numSplits; i++) {
+            const assignedItems = cart.filter((item, idx) => window.splitBillAssignments[idx] === i + 1);
+            if (assignedItems.length === 0) continue;
+
+            const orderNumber = DB.nextOrderNumber();
+            const subtotal = assignedItems.reduce((sum, item) => sum + item.lineTotal, 0);
+            const taxAmount = taxInfo.enabled ? subtotal * taxInfo.percentage / 100 : 0;
+            const total = subtotal + taxAmount;
+
+            const order = DB.insert('orders', {
+                orderNumber,
+                type: orderType,
+                status: 'Completed',
+                subtotal,
+                taxName: taxInfo.name,
+                taxPercentage: taxInfo.percentage,
+                taxAmount,
+                total,
+                userId: user.id,
+                userName: user.name,
+                shiftId: openShift ? openShift.id : null,
+                splitFrom: `split_${Date.now()}`,
+            });
+
+            assignedItems.forEach(item => {
+                DB.insert('order_items', {
+                    orderId: order.id,
+                    menuItemId: item.itemId,
+                    name: item.name,
+                    size: item.size,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                    condiments: item.condiments,
+                    notes: item.notes,
+                    lineTotal: item.lineTotal,
+                });
+            });
+
+            createdOrders.push(order);
+        }
+
+        App.closeModal();
+        cart = [];
+        window.splitBillAssignments = [];
+        updateCart();
+
+        App.toast(`${createdOrders.length} orders created from split bill`);
+
+        // Show receipt for the first order
+        if (createdOrders.length > 0) {
+            Receipt.show(createdOrders[0]);
+        }
+    }
+
+    function showCompletedOnCustomerDisplay(orderNumber, total) {
+        const storeId = DB.getCurrentStore();
+        if (!storeId) return;
+
+        const orderData = {
+            orderNumber,
+            type: orderType,
+            status: 'Completed',
+            subtotal: 0,
+            taxName: '',
+            taxPercentage: 0,
+            taxAmount: 0,
+            total,
+            items: [],
+            timestamp: Date.now(),
+        };
+
+        try {
+            localStorage.setItem(`cd_order_${storeId}`, JSON.stringify(orderData));
+            // Clear after 5 seconds
+            setTimeout(() => {
+                localStorage.removeItem(`cd_order_${storeId}`);
+            }, 5000);
+        } catch (e) {
+            console.warn('[POS] Failed to show completion on customer display:', e.message);
+        }
+    }
+
     // ── Bind Events ────────────────────────────────────────────
     function bindEvents() {
         // Product clicks
         document.querySelectorAll('.pos-product-card').forEach(card => {
-            card.addEventListener('click', () => {
+            card.addEventListener('click', (e) => {
+                // Don't open modal if clicking on favorite toggle
+                if (e.target.closest('.pos-favorite-toggle')) return;
                 openItemModal(card.dataset.itemId);
             });
         });
+
+        // Favorite toggle on product cards
+        document.querySelectorAll('.pos-favorite-toggle').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const itemId = btn.dataset.fav;
+                toggleFavorite(itemId);
+                btn.classList.toggle('active');
+                btn.textContent = btn.classList.contains('active') ? '★' : '☆';
+                btn.title = btn.classList.contains('active') ? 'Remove from favorites' : 'Add to favorites';
+                // Re-render favorites bar
+                const favBar = document.querySelector('.pos-favorites-bar');
+                if (favBar) {
+                    favBar.outerHTML = renderFavoritesBar();
+                    bindFavoriteEvents();
+                }
+            });
+        });
+
+        // Favorite items in favorites bar (one-tap add to cart)
+        bindFavoriteEvents();
 
         // Category filter
         document.querySelectorAll('.pos-cat-btn').forEach(btn => {
@@ -638,7 +1345,26 @@ const POS = (() => {
                     : items.map(item => productCard(item)).join('');
                 // Rebind product clicks
                 document.querySelectorAll('.pos-product-card').forEach(card => {
-                    card.addEventListener('click', () => openItemModal(card.dataset.itemId));
+                    card.addEventListener('click', (e) => {
+                        if (e.target.closest('.pos-favorite-toggle')) return;
+                        openItemModal(card.dataset.itemId);
+                    });
+                });
+                // Rebind favorite toggles
+                document.querySelectorAll('.pos-favorite-toggle').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const itemId = btn.dataset.fav;
+                        toggleFavorite(itemId);
+                        btn.classList.toggle('active');
+                        btn.textContent = btn.classList.contains('active') ? '★' : '☆';
+                        btn.title = btn.classList.contains('active') ? 'Remove from favorites' : 'Add to favorites';
+                        const favBar = document.querySelector('.pos-favorites-bar');
+                        if (favBar) {
+                            favBar.outerHTML = renderFavoritesBar();
+                            bindFavoriteEvents();
+                        }
+                    });
                 });
             });
         }
@@ -655,6 +1381,9 @@ const POS = (() => {
         // Complete order
         document.getElementById('btnCompleteOrder').addEventListener('click', completeOrder);
 
+        // Split bill
+        document.getElementById('btnSplitBill').addEventListener('click', openSplitBillModal);
+
         // Shift bar buttons
         const startShiftBtn = document.querySelector('[data-action="pos-start-shift"]');
         if (startShiftBtn) {
@@ -669,5 +1398,116 @@ const POS = (() => {
         bindCartEvents();
     }
 
-    return { render };
+    function bindFavoriteEvents() {
+        // Favorite items in favorites bar - one tap to add to cart
+        document.querySelectorAll('.pos-favorite-item').forEach(itemEl => {
+            itemEl.addEventListener('click', (e) => {
+                if (e.target.closest('.pos-favorite-remove')) return;
+                const itemId = itemEl.dataset.itemId;
+                quickAddToCart(itemId);
+            });
+        });
+
+        // Remove from favorites
+        document.querySelectorAll('.pos-favorite-remove').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const itemId = btn.dataset.removeFav;
+                toggleFavorite(itemId);
+                const favBar = document.querySelector('.pos-favorites-bar');
+                if (favBar) {
+                    favBar.outerHTML = renderFavoritesBar();
+                    bindFavoriteEvents();
+                }
+                // Also update product card favorite toggle
+                document.querySelectorAll(`.pos-favorite-toggle[data-fav="${itemId}"]`).forEach(toggle => {
+                    toggle.classList.remove('active');
+                    toggle.textContent = '☆';
+                    toggle.title = 'Add to favorites';
+                });
+            });
+        });
+
+        // Show favorites help
+        const helpBtn = document.querySelector('[data-action="show-favorites-help"]');
+        if (helpBtn) {
+            helpBtn.addEventListener('click', showFavoritesHelp);
+        }
+    }
+
+    function quickAddToCart(itemId) {
+        const user = Auth.currentUser();
+        if (user.role === 'cashier' && !Shifts.getOpenShift(user.id)) {
+            App.toast('Start your shift before taking orders', 'error');
+            return;
+        }
+
+        const item = DB.getById('menu_items', itemId);
+        if (!item) return;
+
+        const sizes = DB.query('menu_sizes', s => s.menuItemId === itemId);
+        const selectedSize = sizes.length > 0 ? sizes[0] : null;
+
+        const sizeName = selectedSize ? selectedSize.name : '';
+        const sizePrice = selectedSize ? parseFloat(selectedSize.price) || 0 : 0;
+        const unitPrice = sizePrice;
+        const lineTotal = unitPrice;
+
+        cart.push({
+            itemId: item.id,
+            name: item.name,
+            size: sizeName,
+            sizePrice: sizePrice,
+            quantity: 1,
+            condiments: [],
+            notes: '',
+            unitPrice: unitPrice,
+            lineTotal: lineTotal,
+        });
+
+        updateCart();
+        App.toast(`${item.name} added to order`);
+    }
+
+    function showFavoritesHelp() {
+        App.openModal(`
+            <div class="modal-header">
+                <h3>★ Quick-Add Favorites</h3>
+                <button class="modal-close" onclick="App.closeModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom:16px;color:var(--text-secondary);">Speed up your workflow by pinning your top-selling items for one-tap access.</p>
+                <ul style="display:grid;gap:12px;">
+                    <li style="display:flex;align-items:flex-start;gap:12px;">
+                        <span style="background:var(--primary-50);color:var(--primary);width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;">1</span>
+                        <div><strong>Click the star (☆)</strong> on any menu item to add it to favorites</div>
+                    </li>
+                    <li style="display:flex;align-items:flex-start;gap:12px;">
+                        <span style="background:var(--primary-50);color:var(--primary);width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;">2</span>
+                        <div><strong>Tap a favorite item</strong> in the bar above to instantly add it to the cart</div>
+                    </li>
+                    <li style="display:flex;align-items:flex-start;gap:12px;">
+                        <span style="background:var(--primary-50);color:var(--primary);width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;">3</span>
+                        <div><strong>Click ✕</strong> on a favorite to remove it</div>
+                    </li>
+                    <li style="display:flex;align-items:flex-start;gap:12px;">
+                        <span style="background:var(--primary-50);color:var(--primary);width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;">4</span>
+                        <div><strong>Max 10 favorites</strong> — pick your best sellers!</div>
+                    </li>
+                </ul>
+                <p style="margin-top:16px;font-size:0.85rem;color:var(--text-muted);">
+                    Favorites are saved per browser/device. Each cashier can have their own favorites.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="App.closeModal()">Got it</button>
+            </div>
+        `);
+    }
+
+    return {
+        render,
+        destroyKeyboardShortcuts,
+        initKeyboardShortcuts
+    };
 })();

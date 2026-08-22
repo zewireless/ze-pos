@@ -61,7 +61,7 @@ your data). It does four things:
 
 - **No more "Switch User / Clock In".** Every person signs in with their own
   account. Cashiers who aren't invite-linked yet need one: **Staff → 🔗 Invite**,
-  then they log in at `/index.html` with their own email + password.
+  then they log in at `/login.html` with their own email + password.
 - **Cashier sign-in requires a working invite link.** If a cashier was using the
   old shared-register clock-in, they now need an invite. This is the security fix.
 - **Paywall is now real.** There is no way around it from the browser.
@@ -91,7 +91,7 @@ Not needed if you're staying on manual GCash/Maya/bank billing.
 1. **Owner login** works, dashboard loads, menu/payroll/settings editable.
 2. **Activate a test client** (admin → 💰 Pay) → their app unlocks.
 3. **Cashier flow:** Staff → 🔗 Invite a cashier → join on `/join.html` → sign in
-   as them at `/index.html` → start shift (scheduled) → complete an order.
+   as them at `/login.html` → start shift (scheduled) → complete an order.
 4. **Cashier can't edit menu/settings/payroll** (pages hidden AND DB rejects).
 5. **Cancel/overdue a client** → they can see data but any write fails (server).
 6. **Audit trail:** delete an order / mark payroll paid as owner → a row appears

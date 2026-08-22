@@ -46,11 +46,17 @@
                 <a class="sidebar-link admin-only" data-page="menu">
                     <span class="icon">📋</span> Menu Items
                 </a>
+                <a class="sidebar-link admin-only" data-page="bundles">
+                    <span class="icon">🍽</span> Bundles / Combos
+                </a>
                 <a class="sidebar-link admin-only" data-page="condiments">
                     <span class="icon">🧀</span> Condiments
                 </a>
                 <a class="sidebar-link admin-only" data-page="tax">
                     <span class="icon">💰</span> Tax Setup
+                </a>
+                <a class="sidebar-link admin-only" data-page="stock">
+                    <span class="icon">📦</span> Stock & Inventory
                 </a>
                 <a class="sidebar-link admin-only" data-page="schedules">
                     <span class="icon">📅</span> Shift Schedules
@@ -69,6 +75,12 @@
                 <a class="sidebar-link admin-only" data-page="payroll">
                     <span class="icon">💰</span> Payroll
                 </a>
+                <a class="sidebar-link admin-only" data-page="leaderboards">
+                    <span class="icon">🏆</span> Leaderboards
+                </a>
+                <a class="sidebar-link admin-only" data-page="multistore">
+                    <span class="icon">🏪</span> Multi-Store Reports
+                </a>
 
                 <div class="sidebar-section admin-only">System</div>
                 <a class="sidebar-link admin-only" data-page="settings">
@@ -81,6 +93,10 @@
                 </a>
                 <a class="sidebar-link super-admin-only" href="admin.html">
                     <span class="icon">🛠</span> Admin Dashboard
+                </a>
+                <div class="sidebar-section">Tools</div>
+                <a class="sidebar-link admin-only" href="customer-display.html" target="_blank">
+                    <span class="icon">🖥</span> Customer Display
                 </a>
             </nav>
 
@@ -129,8 +145,14 @@
                 <!-- Menu Module -->
                 <section class="page-module" id="page-menu"></section>
 
+                <!-- Bundles Module -->
+                <section class="page-module" id="page-bundles"></section>
+
                 <!-- Condiments Module -->
                 <section class="page-module" id="page-condiments"></section>
+
+                <!-- Stock Module -->
+                <section class="page-module" id="page-stock"></section>
 
                 <!-- Tax Module -->
                 <section class="page-module" id="page-tax"></section>
@@ -149,6 +171,12 @@
 
                 <!-- Payroll Module -->
                 <section class="page-module" id="page-payroll"></section>
+
+                <!-- Leaderboards Module -->
+                <section class="page-module" id="page-leaderboards"></section>
+
+                <!-- Multi-Store Reports Module -->
+                <section class="page-module" id="page-multistore"></section>
 
                 <!-- Billing Module -->
                 <section class="page-module" id="page-billing"></section>
@@ -193,14 +221,19 @@
     <script src="js/staff.js"></script>
     <script src="js/categories.js"></script>
     <script src="js/menu.js"></script>
+    <script src="js/bundles.js"></script>
     <script src="js/condiments.js"></script>
     <script src="js/tax.js"></script>
+    <script src="js/stock.js"></script>
     <script src="js/schedules.js"></script>
     <script src="js/shifts.js"></script>
     <script src="js/pos.js"></script>
     <script src="js/orders.js"></script>
     <script src="js/reports.js"></script>
+    <script src="js/recipe-cost.js"></script>
     <script src="js/payroll.js"></script>
+    <script src="js/leaderboards.js"></script>
+    <script src="js/multistore-reports.js"></script>
     <script src="js/billing.js"></script>
     <script src="js/receipt.js"></script>
     <script>

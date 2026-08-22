@@ -20,6 +20,7 @@ const DB = (() => {
     const TABLES = [
         'users', 'categories', 'menu_items', 'menu_sizes', 'condiments', 'taxes',
         'orders', 'order_items', 'shifts', 'shift_schedules', 'payrolls', 'settings',
+        'stock_movements', 'bundles', 'bundle_items',
     ];
 
     // public.users only grants SELECT on these columns to anon/authenticated
@@ -64,6 +65,15 @@ const DB = (() => {
             paidAt: 'paid_at', createdAt: 'created_at', storeId: 'store_id'
         },
         settings: { createdAt: 'created_at', storeId: 'store_id' },
+        stock_movements: {
+            menuItemId: 'menu_item_id', menuSizeId: 'menu_size_id', movementType: 'movement_type',
+            quantityChange: 'quantity_change', previousQuantity: 'previous_quantity', newQuantity: 'new_quantity',
+            referenceId: 'reference_id', referenceType: 'reference_type', userId: 'user_id', userName: 'user_name',
+            createdAt: 'created_at', storeId: 'store_id'
+        },
+        bundles: {
+            createdAt: 'created_at', storeId: 'store_id'
+        },
     };
 
     // snake_case → camelCase
@@ -299,7 +309,7 @@ const DB = (() => {
 
         // 1. Auth session
         const session = await Supabase.getSession();
-        if (!session) { window.location.href = 'index.html'; return false; }
+        if (!session) { window.location.href = 'login.html'; return false; }
 
         // 2. Profile → workspace + assigned stores
         const { profile, error: profileErr } = await Supabase.getProfile();

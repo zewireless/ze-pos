@@ -247,7 +247,7 @@ const Auth = (() => {
     async function logout() {
         sessionStorage.removeItem(SESSION_KEY);
         await Supabase.signOut();
-        window.location.href = 'index.html';
+        window.location.href = 'login.html';
     }
 
     // ── password reset (003+ UI) ─────────────────────────────
@@ -259,7 +259,7 @@ const Auth = (() => {
         const client = Supabase.getClient();
         if (!client) return { error: new Error('Supabase not initialized') };
         const { error } = await client.auth.resetPasswordForEmail(email, {
-            redirectTo: window.location.origin + '/index.html',
+            redirectTo: window.location.origin + '/login.html',
         });
         return { error };
     }
@@ -289,7 +289,7 @@ const Auth = (() => {
 
     function requireAuth() {
         if (!currentUser()) {
-            window.location.href = 'index.html';
+            window.location.href = 'login.html';
             return false;
         }
         return true;

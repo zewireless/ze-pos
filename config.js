@@ -15,7 +15,7 @@
  *      "Redirect URLs": add this app's origin, e.g.
  *        https://your-github-pages-or-domain
  *        http://localhost:5500            (for local `python -m http.server 5500`)
- *      The reset link redirects to origin + '/index.html' (see Auth.requestPasswordReset).
+ *      The reset link redirects to origin + '/login.html' (see Auth.requestPasswordReset).
  *   2. Authentication → Email Templates → "Reset Password": keep the default
  *      template containing {{ .ConfirmationURL }}. Supabase appends
  *      #access_token=...&type=recovery to the redirect, which index.html reads

@@ -114,13 +114,17 @@ const App = (() => {
         staff: 'Staff Management',
         categories: 'Categories',
         menu: 'Menu Items',
+        bundles: 'Bundles / Combos',
         condiments: 'Condiments',
         tax: 'Tax Setup',
+        stock: 'Stock & Inventory',
         orders: 'Order History',
         reports: 'Sales Reports',
         shifts: 'Shift Management',
         schedules: 'Shift Schedules',
         payroll: 'Payroll',
+        leaderboards: 'Leaderboards',
+        multistore: 'Multi-Store Reports',
         billing: 'Billing & Subscription',
         settings: 'Settings',
     };
@@ -151,20 +155,77 @@ const App = (() => {
 
         // Call module init
         switch (page) {
-            case 'dashboard': Dashboard.render(); break;
-            case 'pos': POS.render(); break;
-            case 'staff': Staff.render(); break;
-            case 'categories': Categories.render(); break;
-            case 'menu': Menu.render(); break;
-            case 'condiments': Condiments.render(); break;
-            case 'tax': Tax.render(); break;
-            case 'orders': Orders.render(); break;
-            case 'reports': Reports.render(); break;
-            case 'shifts': Shifts.render(); break;
-            case 'schedules': Schedules.render(); break;
-            case 'payroll': Payroll.render(); break;
-            case 'billing': Billing.render(); break;
-            case 'settings': App.renderSettings(); break;
+            case 'dashboard':
+                POS.destroyKeyboardShortcuts?.();
+                Dashboard.render();
+                break;
+            case 'pos':
+                POS.render();
+                break;
+            case 'staff':
+                POS.destroyKeyboardShortcuts?.();
+                Staff.render();
+                break;
+            case 'categories':
+                POS.destroyKeyboardShortcuts?.();
+                Categories.render();
+                break;
+            case 'menu':
+                POS.destroyKeyboardShortcuts?.();
+                Menu.render();
+                break;
+            case 'bundles':
+                POS.destroyKeyboardShortcuts?.();
+                Bundles.render();
+                break;
+            case 'condiments':
+                POS.destroyKeyboardShortcuts?.();
+                Condiments.render();
+                break;
+            case 'tax':
+                POS.destroyKeyboardShortcuts?.();
+                Tax.render();
+                break;
+            case 'orders':
+                POS.destroyKeyboardShortcuts?.();
+                Orders.render();
+                break;
+            case 'reports':
+                POS.destroyKeyboardShortcuts?.();
+                RecipeCost.render();
+                break;
+            case 'shifts':
+                POS.destroyKeyboardShortcuts?.();
+                Shifts.render();
+                break;
+            case 'schedules':
+                POS.destroyKeyboardShortcuts?.();
+                Schedules.render();
+                break;
+            case 'payroll':
+                POS.destroyKeyboardShortcuts?.();
+                Payroll.render();
+                break;
+            case 'leaderboards':
+                POS.destroyKeyboardShortcuts?.();
+                Leaderboards.render();
+                break;
+            case 'multistore':
+                POS.destroyKeyboardShortcuts?.();
+                MultiStoreReports.render();
+                break;
+            case 'billing':
+                POS.destroyKeyboardShortcuts?.();
+                Billing.render();
+                break;
+            case 'settings':
+                POS.destroyKeyboardShortcuts?.();
+                App.renderSettings();
+                break;
+            case 'stock':
+                POS.destroyKeyboardShortcuts?.();
+                Stock.render();
+                break;
         }
 
         // Close mobile sidebar
@@ -541,7 +602,7 @@ const App = (() => {
         Supabase.init();
 
         const session = await Supabase.getSession();
-        if (!session) { window.location.href = 'index.html'; return; }
+        if (!session) { window.location.href = 'login.html'; return; }
 
         try {
             await DB.init();

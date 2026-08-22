@@ -14,6 +14,9 @@ const CACHE_NAME = 'ze-pos-v13';
 const STATIC_ASSETS = [
     './',
     './index.html',
+    './features.html',
+    './contact.html',
+    './login.html',
     './register.html',
     './join.html',
     './admin.html',

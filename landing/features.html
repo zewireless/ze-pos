@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Features — What's Inside ZE-POS</title>
+  <meta name="description" content="A guided tour of ZE-POS: the register, menu, staff & shifts, payroll, reports, and multi-store. See how it works step by step." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+  <header class="nav" id="nav">
+    <div class="nav-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">Z</span>
+        <span class="brand-text">ZE<span class="brand-accent">·</span>POS</span>
+      </a>
+      <nav class="nav-links" id="navLinks">
+        <a href="index.html">Home</a>
+        <a href="features.html" class="active">Features</a>
+        <a href="contact.html">Contact</a>
+        <a href="#" class="btn btn-ghost nav-cta">Sign In</a>
+        <a href="contact.html" class="btn btn-primary">Get Started</a>
+      </nav>
+      <button class="nav-toggle" id="navToggle" aria-label="Menu"><span></span><span></span><span></span></button>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="page-hero">
+    <div class="hero-bg"><div class="orb orb-1"></div><div class="orb orb-2"></div></div>
+    <div class="container">
+      <span class="pill reveal" data-reveal><span class="pulse-dot"></span> Guided product tour</span>
+      <h1 class="reveal" data-reveal data-delay="80">What's inside ZE-POS</h1>
+      <p class="lead reveal" data-reveal data-delay="160">
+        A walk through every screen your team will use — from the first tap on the register to payroll at close.
+        Click any module to see how it works.
+      </p>
+    </div>
+  </section>
+
+  <!-- MODULE TABS -->
+  <section class="section">
+    <div class="container">
+      <div class="tour-tabs reveal" data-reveal id="tourTabs">
+        <button class="tour-tab active" data-tab="pos">🧮 The Register</button>
+        <button class="tour-tab" data-tab="menu">📋 Menu</button>
+        <button class="tour-tab" data-tab="bundles">🍽 Bundles & Combos</button>
+        <button class="tour-tab" data-tab="staff">👥 Staff & Shifts</button>
+        <button class="tour-tab" data-tab="schedules">📅 Shift Schedules</button>
+        <button class="tour-tab" data-tab="stock">📦 Stock & Inventory</button>
+        <button class="tour-tab" data-tab="payroll">💰 Payroll</button>
+        <button class="tour-tab" data-tab="leaderboards">🏆 Leaderboards</button>
+        <button class="tour-tab" data-tab="reports">📊 Reports</button>
+        <button class="tour-tab" data-tab="store">🏪 Multi-Store</button>
+        <button class="tour-tab" data-tab="customer">🖥 Customer Display</button>
+        <button class="tour-tab" data-tab="settings">⚙️ Settings & Billing</button>
+      </div>
+
+      <!-- POS -->
+      <div class="tour-panel active" data-panel="pos">
+        <div class="tour-split">
+          <div class="tour-copy reveal" data-reveal>
+            <h2>The Register</h2>
+            <p>The screen your cashiers live in during a rush. Big, fast, and forgiving.</p>
+            <ul class="tour-points">
+              <li>Category tabs + live search to find any item in a tap</li>
+              <li>Sizes & prices, paid add-ons, and free kitchen notes per line</li>
+              <li>Dine-In, Takeaway, and Delivery order types</li>
+              <li>Tax applies automatically from your Tax Setup</li>
+              <li>Complete an order → printable thermal receipt opens instantly</li>
+              <li>Cashiers must start a shift before they can sell</li>
+            </ul>
+          </div>
+          <div class="tour-visual reveal" data-reveal data-delay="120">
+            <div class="demo-pos" id="demoPos">
+              <div class="demo-tabs">
+                <button class="active" data-cat="all">All</button>
+                <button data-cat="mains">Mains</button>
+                <button data-cat="drinks">Drinks</button>
+                <button data-cat="sides">Sides</button>
+              </div>
+              <div class="demo-body">
+                <div class="demo-grid" id="demoGrid"></div>
+                <div class="demo-cart">
+                  <div class="demo-cart-h">Order <span id="demoOrderNo">#1042</span> · <span id="demoType">Dine-In</span></div>
+                  <div class="demo-types">
+                    <button class="active" data-type="Dine-In">Dine-In</button>
+                    <button data-type="Takeaway">Takeaway</button>
+                    <button data-type="Delivery">Delivery</button>
+                  </div>
+                  <div class="demo-lines" id="demoLines"></div>
+                  <div class="demo-total"><span>Total</span><b id="demoTotal">₱0</b></div>
+                  <button class="demo-pay" id="demoPay">Complete Order</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MENU -->
+      <div class="tour-panel" data-panel="menu">
+        <div class="tour-split">
+          <div class="tour-copy reveal" data-reveal>
+            <h2>Menu & Catalog</h2>
+            <p>Build a menu that looks as good as it tastes.</p>
+            <ul class="tour-points">
+              <li>Categories with enable/disable and search</li>
+              <li>Items with images, descriptions, and kitchen notes</li>
+              <li>Multiple sizes & prices per item (Small / Medium / Large)</li>
+              <li>Global paid condiments — Extra Cheese, Less Ice, etc.</li>
+              <li>One tax name & rate with a live preview</li>
+              <li>New workspaces get a starter menu automatically</li>
+            </ul>
+          </div>
+          <div class="tour-visual reveal" data-reveal data-delay="120">
+            <div class="demo-menu">
+              <div class="demo-menu-cats">
+                <span class="active">Mains</span><span>Sides</span><span>Drinks</span><span>Desserts</span>
+              </div>
+              <div class="demo-menu-item">
+                <div class="dmi-img">🍔</div>
+                <div class="dmi-body">
+                  <b>Classic Cheeseburger</b>
+                  <p>Beef patty, cheddar, lettuce, tomato. <em>Note: "no onions" supported.</em></p>
+                  <div class="dmi-sizes">
+                    <span class="active">Solo ₱120</span><span>Combo ₱180</span><span>Family ₱320</span>
+                  </div>
+                </div>
+              </div>
+              <div class="demo-menu-item">
+                <div class="dmi-img">🥤</div>
+                <div class="dmi-body">
+                  <b>Iced Americano</b>
+                  <p>Cold brew over ice.</p>
+                  <div class="dmi-sizes"><span class="active">Regular ₱60</span><span>Large ₱80</span></div>
+                </div>
+              </div>
+              <div class="demo-condiments">
+                <span>+ Extra Shot ₱20</span><span>+ Oat Milk ₱15</span><span>+ Less Ice</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STAFF -->
+      <div class="tour-panel" data-panel="staff">
+        <div class="tour-split">
+          <div class="tour-copy reveal" data-reveal>
+            <h2>Staff, Shifts & Schedules</h2>
+            <p>Your workforce, managed without the spreadsheet.</p>
+            <ul class="tour-points">
+              <li>Admin & Cashier roles with their own secure login</li>
+              <li>7-day invite codes — staff set their own password</li>
+              <li>Weekly or one-off schedules, including overnight shifts</li>
+              <li>Cashiers can't start a shift unless they're scheduled</li>
+              <li>Open-shift indicator, order count, and live sales</li>
+              <li>Float-in / count-out with shortage & overage</li>
+            </ul>
+          </div>
+          <div class="tour-visual reveal" data-reveal data-delay="120">
+            <div class="demo-staff">
+              <div class="demo-shift-bar">
+                <span class="dot-open"></span> Shift open · 23 orders · ₱4,180 sold
+              </div>
+              <div class="demo-sched">
+                <div class="ds-row"><span>Mon</span><b>09:00–17:00</b><i>Mara</i></div>
+                <div class="ds-row"><span>Tue</span><b>17:00–01:00</b><i>Joel</i></div>
+                <div class="ds-row"><span>Wed</span><b>09:00–17:00</b><i>Mara</i></div>
+                <div class="ds-row overnight"><span>Thu</span><b>22:00–06:00</b><i>Tin</i></div>
+              </div>
+              <div class="demo-invite">
+                <span>Invite sent</span>
+                <code>ZE-JOIN-7F3K9Q</code>
+                <small>expires in 7 days</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAYROLL -->
+      <div class="tour-panel" data-panel="payroll">
+        <div class="tour-split">
+          <div class="tour-copy reveal" data-reveal>
+            <h2>Payroll</h2>
+            <p>Turn clocked hours into payslips in a few clicks.</p>
+            <ul class="tour-points">
+              <li>Hours pulled from closed shifts only</li>
+              <li>Hourly or fixed-weekly pay, with per-shift overrides</li>
+              <li>Overtime: daily + weekly thresholds, no double count</li>
+              <li>Period presets: This Week / Month / Last 30 Days</li>
+              <li>Save runs, mark paid/unpaid, export CSV</li>
+              <li>Open shifts flagged until closed</li>
+            </ul>
+          </div>
+          <div class="tour-visual reveal" data-reveal data-delay="120">
+            <div class="demo-payroll">
+              <div class="dp-head">Payroll · This Month</div>
+              <div class="dp-row"><span>Mara L.</span><b>₱9,600</b><i>160h</i></div>
+              <div class="dp-row"><span>Joel R.</span><b>₱7,420</b><i>120h · 8h OT</i></div>
+              <div class="dp-row"><span>Tin V.</span><b>₱5,200</b><i>80h</i></div>
+              <div class="dp-total"><span>Total labor</span><b>₱22,220</b></div>
+              <div class="dp-actions"><button class="btn btn-primary btn-sm">Save run</button><button class="btn btn-ghost btn-sm">Export CSV</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- REPORTS -->
+      <div class="tour-panel" data-panel="reports">
+        <div class="tour-split">
+          <div class="tour-copy reveal" data-reveal>
+            <h2>Dashboard & Reports</h2>
+            <p>Know your numbers without leaving the app.</p>
+            <ul class="tour-points">
+              <li>Today's revenue, orders, and open shifts at a glance</li>
+              <li>7-day revenue chart (Chart.js)</li>
+              <li>Daily / monthly / custom sales reports</li>
+              <li>Per-cashier performance: orders, revenue, AOV</li>
+              <li>Tax collected and labor-cost cards</li>
+              <li>Exportable, paginated history</li>
+            </ul>
+          </div>
+          <div class="tour-visual reveal" data-reveal data-delay="120">
+            <div class="demo-reports">
+              <div class="dr-kpis">
+                <div><b>₱48,210</b><span>Revenue</span></div>
+                <div><b>312</b><span>Orders</span></div>
+                <div><b>₱154</b><span>AOV</span></div>
+                <div><b>₱4,380</b><span>Tax</span></div>
+              </div>
+              <div class="dr-chart">
+                <div class="bar" style="height:40%"></div>
+                <div class="bar" style="height:62%"></div>
+                <div class="bar" style="height:55%"></div>
+                <div class="bar" style="height:78%"></div>
+                <div class="bar" style="height:70%"></div>
+                <div class="bar" style="height:92%"></div>
+                <div class="bar" style="height:84%"></div>
+              </div>
+              <div class="dr-axis"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BUNDLES -->
+      <div class="tour-panel" data-panel="bundles">
+        <div class="tour-split">
+          <div class="tour-copy reveal" data-reveal>
+            <h2>Bundles & Combos</h2>
+            <p>Sell meal deals that expand to individual items in the kitchen.</p>
+            <ul class="tour-points">
+              <li>Create combos from existing menu items (Burger + Fries + Drink)</li>
+              <li>Set a bundle price — discount auto-calculated</li>
+              <li>Kitchen receives each item separately; customer sees one line</li>
+              <li>Track bundle vs à la carte sales in reports</li>
+              <li>Optional: force specific sizes or allow customer choice</li>
+            </ul>
+          </div>
+          <div class="tour-visual reveal" data-reveal data-delay="120">
+            <div class="demo-menu">
+              <div class="demo-menu-cats">
+                <span class="active">Combos</span><span>Mains</span><span>Sides</span>
+              </div>
+              <div class="demo-menu-item">
+                <div class="dmi-img">🍔</div>
+                <div class="dmi-body">
+                  <b>Burger Combo</b>
+                  <p>Cheeseburger + Regular Fries + Iced Tea. <em>Saves ₱30 vs à la carte.</em></p>
+                  <div class="dmi-sizes">
+                    <span class="active">Solo ₱210</span><span>Large Drink ₱230</span>
+                  </div>
+                </div>
+              </div>
+              <div class="demo-menu-item">
+                <div class="dmi-img">🍕</div>
+                <div class="dmi-body">
+                  <b>Pizza Family Deal</b>
+                  <p>2 Large Pizzas + 2L Soda + Garlic Bread.</p>
+                  <div class="dmi-sizes"><span class="active">₱899</span></div>
+                </div>
+              </div>
+              <div class="demo-condiments">
+                <span>📦 Kitchen receives: Burger, Fries, Tea</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCHEDULES -->
+      <div class="tour-panel" data-panel="schedules">
+        <div class="tour-split">
+          <div class="tour-copy reveal" data-reveal>
+            <h2>Shift Schedules</h2>
+            <p>Recurring weekly schedules with overnight support and holiday overrides.</p>
+            <ul class="tour-points">
+              <li>Weekly recurring schedules — set once, repeats automatically</li>
+              <li>Overnight shifts (e.g., 22:00–06:00) handled correctly</li>
+              <li>One-off shifts for holidays, events, or cover</li>
+              <li>Cashiers only see shifts assigned to them</li>
+              <li>Auto-blocks POS if no shift is scheduled</li>
+              <li>Shift reminders sent before start time</li>
+            </ul>
+          </div>
+          <div class="tour-visual reveal" data-reveal data-delay="120">
+            <div class="demo-staff">
+              <div class="demo-sched">
+                <div class="ds-row"><span>Mon</span><b>09:00–17:00</b><i>Mara</i></div>
+                <div class="ds-row"><span>Tue</span><b>17:00–01:00</b><i>Joel</i></div>
+                <div class="ds-row"><span>Wed</span><b>09:00–17:00</b><i>Mara</i></div>
+                <div class="ds-row overnight"><span>Thu</span><b>22:00–06:00</b><i>Tin</i></div>
+                <div class="ds-row"><span>Fri</span><b>09:00–17:00</b><i>Mara</i></div>
+                <div class="ds-row"><span>Sat</span><b>10:00–22:00</b><i>Joel, Tin</i></div>
+                <div class="ds-row"><span>Sun</span><b>10:00–20:00</b><i>Mara</i></div>
+              </div>
+              <div class="demo-invite">
+                <span>Holiday override</span>
+                <code>Dec 25 · 10:00–16:00 · Mara</code>
+                <small>one-off shift</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STOCK -->
+      <div class="tour-panel" data-panel="stock">
+        <div class="tour-split">
+          <div class="tour-copy reveal" data-reveal>
+            <h2>Stock & Inventory</h2>
+            <p>Track ingredients, set par levels, and know your true margins with recipe costing.</p>
+            <ul class="tour-points">
+              <li>Ingredients with units (kg, L, pcs) and current stock levels</li>
+              <li>Par levels with low-stock alerts on dashboard</li>
+              <li>Stock-in / stock-out logs with reason codes</li>
+              <li>Recipe costing — link ingredients to menu items, see true margin</li>
+              <li>Auto-deduct stock when orders complete (optional)</li>
+              <li>Export inventory for purchasing</li>
+            </ul>
+          </div>
+          <div class="tour-visual reveal" data-reveal data-delay="120">
+            <div class="demo-staff" style="padding: 18px;">
+              <div class="demo-shift-bar" style="background: rgba(99,102,241,.12); border-color: rgba(99,102,241,.3); color: var(--indigo-300);">
+                <span style="width:8px;height:8px;border-radius:50%;background:var(--indigo-400)"></span> 4 items low · 1 out
+              </div>
+              <div class="demo-sched">
+                <div class="ds-row"><span>🥩</span><b>Beef Patty</b><i>2.3 kg · Par: 5 kg</i></div>
+                <div class="ds-row"><span>🍟</span><b>Frozen Fries</b><i>8 kg · Par: 10 kg</i></div>
+                <div class="ds-row"><span>☕</span><b>Coffee Beans</b><i>0.5 kg · Par: 2 kg</i></div>
+                <div class="ds-row overnight"><span>🥛</span><b>Oat Milk</b><i>0 L · OUT OF STOCK</i></div>
+              </div>
+              <div class="demo-invite">
+                <span>Recipe: Cheeseburger</span>
+                <code>Beef 150g + Cheese 20g + Bun 1pc = ₱42 cost (65% margin)</code>
+                <small>auto-calculated from ingredient prices</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LEADERBOARDS -->
+      <div class="tour-panel" data-panel="leaderboards">
+        <div class="tour-split">
+          <div class="tour-copy reveal" data-reveal>
+            <h2>Leaderboards</h2>
+            <p>Gamify your floor — live rankings that cashiers actually check.</p>
+            <ul class="tour-points">
+              <li>Top Seller — most revenue this week/month</li>
+              <li>Highest AOV — biggest average ticket</li>
+              <li>Most Orders — volume champion</li>
+              <li>Upsell King — most add-ons/condiments sold</li>
+              <li>Period tabs: Today / This Week / This Month</li>
+              <li>Visible to all staff on dashboard</li>
+            </ul>
+          </div>
+          <div class="tour-visual reveal" data-reveal data-delay="120">
+            <div class="demo-payroll">
+              <div class="dp-head">Leaderboards · This Week</div>
+              <div class="dp-row"><span>🥇 Mara L.</span><b>₱24,500</b><i>142 orders</i></div>
+              <div class="dp-row"><span>🥈 Joel R.</span><b>₱18,200</b><i>128 orders</i></div>
+              <div class="dp-row"><span>🥉 Tin V.</span><b>₱12,100</b><i>95 orders</i></div>
+              <div class="dp-total"><span>Top AOV</span><b>Mara — ₱172</b></div>
+              <div class="dp-total"><span>Top Upsell</span><b>Joel — 38 add-ons</b></div>
+              <div class="dp-actions"><button class="btn btn-primary btn-sm">View Full Board</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CUSTOMER DISPLAY -->
+      <div class="tour-panel" data-panel="customer">
+        <div class="tour-split">
+          <div class="tour-copy reveal" data-reveal>
+            <h2>Customer Display</h2>
+            <p>A second screen facing the customer — order, total, and change at a glance.</p>
+            <ul class="tour-points">
+              <li>Opens in a new tab — use any spare tablet, phone, or monitor</li>
+              <li>Shows live cart as cashier adds items</li>
+              <li>Displays order type, subtotal, tax, and grand total</li>
+              <li>Shows change due when cash is tendered</li>
+              <li>Auto-updates when items added/removed</li>
+              <li>No extra hardware — just a browser</li>
+            </ul>
+          </div>
+          <div class="tour-visual reveal" data-reveal data-delay="120">
+            <div class="demo-pos" style="min-height: 380px;">
+              <div class="demo-body" style="grid-template-columns: 1fr; background: #0d0c1e;">
+                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;text-align:center;">
+                  <div style="font-size:3rem;margin-bottom:8px;">🧾</div>
+                  <div style="font-size:1.5rem;font-weight:700;margin-bottom:4px;">Order #1042</div>
+                  <div style="color:var(--muted);margin-bottom:24px;">Dine-In</div>
+                  <div style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:320px;">
+                    <div class="demo-line" style="padding:10px;background:var(--card-2);border-radius:10px;"><span>Cheeseburger</span><b>₱120</b></div>
+                    <div class="demo-line" style="padding:10px;background:var(--card-2);border-radius:10px;"><span>+ Extra Cheese</span><b>₱20</b></div>
+                    <div class="demo-line" style="padding:10px;background:var(--card-2);border-radius:10px;"><span>Iced Tea</span><b>₱40</b></div>
+                  </div>
+                  <div style="margin-top:24px;padding-top:16px;border-top:1px dashed var(--line);font-size:1.5rem;font-weight:800;">
+                    <span>Total</span><b style="margin-left:12px;">₱180</b>
+                  </div>
+                  <div style="margin-top:8px;color:var(--indigo-300);font-size:0.9rem;">Cash tendered: ₱200 → Change: ₱20</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SETTINGS & BILLING -->
+      <div class="tour-panel" data-panel="settings">
+        <div class="tour-split">
+          <div class="tour-copy reveal" data-reveal>
+            <h2>Settings & Billing</h2>
+            <p>Configure your business, customize receipts, and manage your subscription.</p>
+            <ul class="tour-points">
+              <li>Business name, address, phone, timezone, currency</li>
+              <li>Receipt footer — custom message, QR code, social links</li>
+              <li>Receipt template — thermal 58mm/80mm, logo, tax breakdown</li>
+              <li>Self-serve billing — GCash, Maya, bank transfer</li>
+              <li>Subscription status, next renewal, invoice history</li>
+              <li>Super-admin dashboard for managing all workspaces</li>
+            </ul>
+          </div>
+          <div class="tour-visual reveal" data-reveal data-delay="120">
+            <div class="demo-staff" style="padding: 18px;">
+              <div class="demo-sched">
+                <div class="ds-row"><span>🏢</span><b>Business Name</b><i>Burger Joint Makati</i></div>
+                <div class="ds-row"><span>📍</span><b>Address</b><i>123 Ayala Ave, Makati</i></div>
+                <div class="ds-row"><span>🌍</span><b>Timezone</b><i>Asia/Manila (UTC+8)</i></div>
+                <div class="ds-row"><span>💱</span><b>Currency</b><i>PHP (₱)</i></div>
+              </div>
+              <div class="demo-invite">
+                <span>Receipt Footer</span>
+                <code>"Thank you! Follow us @burgerjointph"</code>
+                <small>printed on every receipt</small>
+              </div>
+              <div class="demo-shift-bar" style="background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.3); color: #fcd34d;">
+                <span style="width:8px;height:8px;border-radius:50%;background:var(--warn)"></span> Subscription active · Renews Jan 15, 2026 · ₱999/mo
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STORE -->
+      <div class="tour-panel" data-panel="store">
+        <div class="tour-split">
+          <div class="tour-copy reveal" data-reveal>
+            <h2>Multi-Store</h2>
+            <p>One account, many branches — each with its own world.</p>
+            <ul class="tour-points">
+              <li>Add, rename, or remove stores (can't delete the default)</li>
+              <li>Per-store menu, orders, shifts, and settings</li>
+              <li>Assign cashiers to specific stores</li>
+              <li>Header store switcher when on multiple</li>
+              <li>Data isolated by workspace + store</li>
+              <li>Order numbers are per store</li>
+            </ul>
+          </div>
+          <div class="tour-visual reveal" data-reveal data-delay="120">
+            <div class="demo-store">
+              <div class="ds-switch">
+                <span class="active">🏪 Makati</span><span>🏪 Cebu</span><span>🏪 Davao</span>
+              </div>
+              <div class="ds-panel">
+                <div class="ds-stat"><b>₱18,400</b><span>Today · Makati</span></div>
+                <div class="ds-stat"><b>142</b><span>Orders</span></div>
+                <div class="ds-stat"><b>5</b><span>Staff on shift</span></div>
+                <div class="ds-stat"><b>86</b><span>Menu items</span></div>
+              </div>
+              <p class="ds-note">Switch store from the header — numbers, menu, and staff update instantly.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="section section-alt">
+    <div class="container narrow">
+      <div class="section-head reveal" data-reveal>
+        <span class="eyebrow">Good to know</span>
+        <h2>Frequently asked</h2>
+      </div>
+      <div class="faq reveal" data-reveal>
+        <details><summary>Do I need special hardware?</summary><p>No. ZE-POS runs in any modern browser and installs as a PWA on tablets and phones. Pair a thermal printer for receipts if you like.</p></details>
+        <details><summary>How do I pay?</summary><p>Monthly via GCash, Maya, or bank transfer. Submit a claim in Billing and the admin activates it. PayMongo checkout is coming soon.</p></details>
+        <details><summary>Can cashiers have their own login?</summary><p>Yes. Each person gets their own secure Supabase account via a 7-day invite code. You never see their password.</p></details>
+        <details><summary>What if my internet drops?</summary><p>ZE-POS keeps an offline outbox and retries writes when you're back online, so a brief dropout won't stop a sale.</p></details>
+        <details><summary>Is my data safe?</summary><p>Row-level security isolates every business and store. A paywall is enforced in the database, and all sensitive changes are audited.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-band">
+    <div class="container cta-inner reveal" data-reveal>
+      <h2>See it on your own counter</h2>
+      <p>Start a free trial or book a live walkthrough with our team.</p>
+      <div class="hero-actions">
+        <a href="contact.html" class="btn btn-light btn-lg">Get Started Free</a>
+        <a href="contact.html" class="btn btn-ghost-light btn-lg">Book a Demo</a>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <a href="index.html" class="brand"><span class="brand-mark">Z</span><span class="brand-text">ZE<span class="brand-accent">·</span>POS</span></a>
+        <p>Cloud point-of-sale for restaurants, cafés & food counters.</p>
+      </div>
+      <div class="footer-col"><h4>Product</h4><a href="features.html">Features</a><a href="index.html#pricing">Pricing</a><a href="index.html#how">How it works</a></div>
+      <div class="footer-col"><h4>Company</h4><a href="contact.html">Contact</a><a href="#">About</a><a href="#">Careers</a></div>
+      <div class="footer-col"><h4>Get in touch</h4><a href="mailto:hello@ze-pos.com">hello@ze-pos.com</a><a href="contact.html">Book a demo</a></div>
+    </div>
+    <div class="footer-bottom container"><span>© 2026 ZE-POS. All rights reserved.</span><span>Made for food businesses everywhere.</span></div>
+  </footer>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contact — ZE-POS</title>
+  <meta name="description" content="Get in touch with the ZE-POS team. Start a free trial, book a demo, or ask us anything." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+  <header class="nav" id="nav">
+    <div class="nav-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">Z</span>
+        <span class="brand-text">ZE<span class="brand-accent">·</span>POS</span>
+      </a>
+      <nav class="nav-links" id="navLinks">
+        <a href="index.html">Home</a>
+        <a href="features.html">Features</a>
+        <a href="contact.html" class="active">Contact</a>
+        <a href="#" class="btn btn-ghost nav-cta">Sign In</a>
+        <a href="#form" class="btn btn-primary">Get Started</a>
+      </nav>
+      <button class="nav-toggle" id="navToggle" aria-label="Menu"><span></span><span></span><span></span></button>
+    </div>
+  </header>
+
+  <section class="page-hero">
+    <div class="hero-bg"><div class="orb orb-1"></div><div class="orb orb-2"></div></div>
+    <div class="container">
+      <span class="pill reveal" data-reveal><span class="pulse-dot"></span> We'd love to hear from you</span>
+      <h1 class="reveal" data-reveal data-delay="80">Let's talk about your counter</h1>
+      <p class="lead reveal" data-reveal data-delay="160">
+        Whether you're ready to start a trial, want a live walkthrough, or just have questions — drop us a line.
+        We usually reply within a few hours (faster if you message during PH business hours).
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container contact-grid">
+      <div class="contact-info reveal" data-reveal>
+        <h2>Get in touch</h2>
+        <div class="ci-row">
+          <span class="ci-icon">📧</span>
+          <div><b>Email</b><br /><a href="mailto:hello@ze-pos.com">hello@ze-pos.com</a></div>
+        </div>
+        <div class="ci-row">
+          <span class="ci-icon">💬</span>
+          <div><b>Chat</b><br /><a href="#">Live chat on the app</a></div>
+        </div>
+        <div class="ci-row">
+          <span class="ci-icon">📍</span>
+          <div><b>Based in</b><br />Philippines · Serving globally</div>
+        </div>
+        <div class="ci-row">
+          <span class="ci-icon">🕐</span>
+          <div><b>Response time</b><br />Mon–Fri, 9am–6pm PHT (UTC+8)</div>
+        </div>
+        <div class="ci-divider"></div>
+        <h3>Quick actions</h3>
+        <div class="ci-actions">
+          <a href="contact.html#form" class="btn btn-primary">Start free trial</a>
+          <a href="contact.html#form" class="btn btn-ghost">Book a demo call</a>
+        </div>
+      </div>
+
+      <div class="contact-form reveal" data-reveal data-delay="120" id="form">
+        <div class="form-card">
+          <h2>Send us a message</h2>
+          <p class="form-sub">We'll get back to you within one business day.</p>
+          <form id="contactForm" novalidate>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="name">Name *</label>
+                <input type="text" id="name" name="name" required autocomplete="name" placeholder="Your name" />
+              </div>
+              <div class="form-group">
+                <label for="email">Email *</label>
+                <input type="email" id="email" name="email" required autocomplete="email" placeholder="you@business.com" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="business">Business name</label>
+                <input type="text" id="business" name="business" autocomplete="organization" placeholder="Your shop name" />
+              </div>
+              <div class="form-group">
+                <label for="phone">Phone</label>
+                <input type="tel" id="phone" name="phone" autocomplete="tel" placeholder="+63 9XX XXX XXXX" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="topic">What can we help with? *</label>
+              <select id="topic" name="topic" required>
+                <option value="">Choose one...</option>
+                <option value="trial">Start a free trial</option>
+                <option value="demo">Book a live demo</option>
+                <option value="pricing">Pricing & plans</option>
+                <option value="support">Technical support</option>
+                <option value="partnership">Partnership / reseller</option>
+                <option value="other">Something else</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="message">Message *</label>
+              <textarea id="message" name="message" rows="5" required placeholder="Tell us about your business, what you need, or just say hi!"></textarea>
+            </div>
+            <div class="form-group checkbox-group">
+              <input type="checkbox" id="updates" name="updates" value="1" />
+              <label for="updates">Keep me posted on product updates and tips for running my food business.</label>
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg btn-full">Send message</button>
+            <p class="form-note">By submitting, you agree to our <a href="#">Privacy Policy</a>.</p>
+          </form>
+          <div id="formSuccess" class="form-success hidden">
+            <div class="success-icon">✓</div>
+            <h3>Message sent!</h3>
+            <p>Thanks for reaching out. We'll reply to <strong id="replyEmail"></strong> shortly.</p>
+            <button class="btn btn-ghost" id="formReset">Send another</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-alt narrow">
+    <div class="container">
+      <div class="section-head reveal" data-reveal>
+        <span class="eyebrow">Start now</span>
+        <h2>Or just jump in — free trial, no card</h2>
+        <p>Create your business, build your menu, and invite your first cashier in minutes.</p>
+      </div>
+      <div class="trial-steps reveal" data-reveal data-delay="80">
+        <div class="ts"><span>1</span><b>Sign up</b> — business name, email, password</div>
+        <div class="ts"><span>2</span><b>Build menu</b> — categories, items, prices</div>
+        <div class="ts"><span>3</span><b>Invite team</b> — send 7-day join codes</div>
+        <div class="ts"><span>4</span><b>Sell</b> — start a shift, take orders</div>
+      </div>
+      <div class="cta-center reveal" data-reveal data-delay="160">
+        <a href="contact.html#form" class="btn btn-primary btn-lg">Create my free account</a>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <a href="index.html" class="brand"><span class="brand-mark">Z</span><span class="brand-text">ZE<span class="brand-accent">·</span>POS</span></a>
+        <p>Cloud point-of-sale for restaurants, cafés & food counters.</p>
+      </div>
+      <div class="footer-col"><h4>Product</h4><a href="features.html">Features</a><a href="index.html#pricing">Pricing</a><a href="index.html#how">How it works</a></div>
+      <div class="footer-col"><h4>Company</h4><a href="contact.html">Contact</a><a href="#">About</a><a href="#">Careers</a></div>
+      <div class="footer-col"><h4>Get in touch</h4><a href="mailto:hello@ze-pos.com">hello@ze-pos.com</a><a href="contact.html">Book a demo</a></div>
+    </div>
+    <div class="footer-bottom container"><span>© 2026 ZE-POS. All rights reserved.</span><span>Made for food businesses everywhere.</span></div>
+  </footer>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>

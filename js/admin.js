@@ -43,13 +43,13 @@ const Admin = (() => {
     async function init() {
         Supabase.init();
         const session = await Supabase.getSession();
-        if (!session) { window.location.href = 'index.html'; return; }
+        if (!session) { window.location.href = 'login.html'; return; }
         const { profile } = await Supabase.getProfile();
         if (!profile || !profile.is_super_admin) { window.location.href = 'app.html'; return; }
         selfId = profile.id;
         $('adminUser').textContent = profile.business_name || 'Owner';
 
-        $('btnAdminLogout').addEventListener('click', () => Supabase.signOut().then(() => { window.location.href = 'index.html'; }));
+        $('btnAdminLogout').addEventListener('click', () => Supabase.signOut().then(() => { window.location.href = 'login.html'; }));
         $('btnAdminRefresh').addEventListener('click', load);
         $('btnNewPlan').addEventListener('click', () => openPlanForm(null));
         $('btnRefreshPending').addEventListener('click', loadPending);

@@ -1,10 +1,13 @@
 /**
  * Shifts – Manual shift lifecycle management and history
+ * Includes: break tracking, shift notes/handover log
  */
 const Shifts = (() => {
     let filterStatus = '';
     let filterDateFrom = '';
     let filterDateTo = '';
+    let activeBreakTimer = null;
+    let breakTimerInterval = null;
 
     function render() {
         const el = document.getElementById('page-shifts');
@@ -497,7 +500,7 @@ const Shifts = (() => {
         return { ok: true, shift };
     }
 
-    function endShift(shiftId, endingCash) {
+    function endShift(shiftId, endingCash, notes, handoverNotes) {
         const shift = DB.getById('shifts', shiftId);
         if (!shift || shift.status !== 'open') return null;
 
@@ -515,6 +518,8 @@ const Shifts = (() => {
             totalSales,
             orderCount,
             cashDifference,
+            notes: notes || shift.notes,
+            handover_notes: handoverNotes || shift.handover_notes,
         });
     }
 
@@ -540,5 +545,238 @@ const Shifts = (() => {
         return shifts.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
     }
 
-    return { render, getOpenShift, startShift, endShift };
+    // ── Break Tracking ────────────────────────────────────────────────
+    function getActiveBreak(shiftId) {
+        return DB.query('breaks', b => b.shiftId === shiftId && b.endTime === null);
+    }
+
+    function getShiftBreaks(shiftId) {
+        return DB.query('breaks', b => b.shiftId === shiftId).sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+    }
+
+    function startBreak(shiftId, breakType = 'rest') {
+        const user = Auth.currentUser();
+        const activeBreaks = getActiveBreak(shiftId).filter(b => b.userId === user.id);
+        if (activeBreaks.length > 0) {
+            return { ok: false, message: 'You already have an active break' };
+        }
+
+        const breakRecord = DB.insert('breaks', {
+            shiftId,
+            userId: user.id,
+            breakType,
+            startTime: new Date().toISOString(),
+            endTime: null,
+            durationMinutes: null,
+        });
+
+        return { ok: true, break: breakRecord };
+    }
+
+    function endBreak(breakId) {
+        const user = Auth.currentUser();
+        const breakRecord = DB.getById('breaks', breakId);
+        if (!breakRecord || breakRecord.userId !== user.id || breakRecord.endTime !== null) {
+            return { ok: false, message: 'Break not found or already ended' };
+        }
+
+        const endTime = new Date().toISOString();
+        const startTime = new Date(breakRecord.startTime);
+        const durationMinutes = Math.round((new Date(endTime) - startTime) / 60000);
+
+        const updated = DB.update('breaks', breakId, {
+            endTime,
+            durationMinutes,
+        });
+
+        // Update total break minutes on shift
+        const shift = DB.getById('shifts', breakRecord.shiftId);
+        if (shift) {
+            const allBreaks = getShiftBreaks(shift.id);
+            const totalBreakMinutes = allBreaks.reduce((sum, b) => sum + (b.durationMinutes || 0), 0);
+            DB.update('shifts', shift.id, { total_break_minutes: totalBreakMinutes });
+        }
+
+        return { ok: true, break: updated };
+    }
+
+    function formatBreakDuration(minutes) {
+        if (!minutes || minutes < 1) return '0m';
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+    }
+
+    function renderBreakControls(shift) {
+        const user = Auth.currentUser();
+        const activeBreak = getActiveBreak(shift.id).find(b => b.userId === user.id);
+        const allBreaks = getShiftBreaks(shift.id).filter(b => b.userId === user.id);
+
+        if (activeBreak) {
+            // Currently on break - show end break button with timer
+            const startTime = new Date(activeBreak.startTime);
+            return `
+                <div class="break-status active" data-break-id="${activeBreak.id}">
+                    <div class="break-info">
+                        <span class="break-type-badge ${activeBreak.breakType}">${activeBreak.breakType}</span>
+                        <span class="break-timer" data-start="${activeBreak.startTime}">Calculating...</span>
+                    </div>
+                    <button class="btn btn-danger btn-sm" data-action="end-break" data-break-id="${activeBreak.id}">End Break</button>
+                </div>
+            `;
+        } else {
+            // Not on break - show start break options
+            const totalBreakMins = allBreaks.reduce((sum, b) => sum + (b.durationMinutes || 0), 0);
+            return `
+                <div class="break-status">
+                    <div class="break-info">
+                        <span>Total break time: <strong>${formatBreakDuration(totalBreakMins)}</strong></span>
+                        ${shift.total_break_minutes ? `<span class="text-muted"> (Shift total: ${formatBreakDuration(shift.total_break_minutes)})</span>` : ''}
+                    </div>
+                    <div class="break-actions">
+                        <button class="btn btn-outline btn-sm" data-action="start-break" data-type="rest">☕ Rest (15m)</button>
+                        <button class="btn btn-outline btn-sm" data-action="start-break" data-type="meal">🍽 Meal (30m)</button>
+                        <button class="btn btn-outline btn-sm" data-action="start-break" data-type="personal">👤 Personal</button>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    function startBreakTimer() {
+        if (breakTimerInterval) clearInterval(breakTimerInterval);
+        breakTimerInterval = setInterval(() => {
+            document.querySelectorAll('.break-timer[data-start]').forEach(el => {
+                const start = new Date(el.dataset.start);
+                const diff = Math.round((new Date() - start) / 60000);
+                const hours = Math.floor(diff / 60);
+                const mins = diff % 60;
+                el.textContent = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+            });
+        }, 1000);
+    }
+
+    function stopBreakTimer() {
+        if (breakTimerInterval) clearInterval(breakTimerInterval);
+        breakTimerInterval = null;
+    }
+
+    function bindBreakEvents() {
+        // Start break
+        document.querySelectorAll('[data-action="start-break"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const openShift = getOpenShift(Auth.currentUser().id);
+                if (!openShift) return;
+
+                const type = btn.dataset.type;
+                const result = startBreak(openShift.id, type);
+                if (result.ok) {
+                    App.toast(`${type} break started`);
+                    render(); // Re-render to show timer
+                } else {
+                    App.toast(result.message, 'error');
+                }
+            });
+        });
+
+        // End break
+        document.querySelectorAll('[data-action="end-break"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const breakId = btn.dataset.breakId;
+                const result = endBreak(breakId);
+                if (result.ok) {
+                    App.toast(`Break ended (${formatBreakDuration(result.break.durationMinutes)})`);
+                    render();
+                } else {
+                    App.toast(result.message, 'error');
+                }
+            });
+        });
+    }
+
+    // ── Shift Notes / Handover ─────────────────────────────────────
+    function openShiftNotesModal(shift) {
+        const user = Auth.currentUser();
+        const isAdmin = Auth.isAdmin();
+        const canEdit = shift.status === 'open' && (shift.userId === user.id || isAdmin);
+
+        const notesHtml = `
+            <div class="modal-header">
+                <h3>${shift.status === 'open' ? 'Shift Notes' : 'Shift Summary'}</h3>
+                <button class="modal-close" onclick="App.closeModal()">✕</button>
+            </div>
+            <div class="modal-body" style="max-height:70vh;overflow:auto;">
+                ${shift.notes ? `
+                    <div class="form-group">
+                        <label>Your Notes</label>
+                        <textarea class="form-control" id="shiftNotes" rows="4" placeholder="Notes for this shift..." ${canEdit ? '' : 'readonly'}>${App.escapeHtml(shift.notes || '')}</textarea>
+                    </div>
+                ` : ''}
+
+                ${shift.handover_notes ? `
+                    <div class="form-group">
+                        <label>Handover Notes <span class="text-muted">(visible to next cashier & admins)</span></label>
+                        <textarea class="form-control" id="handoverNotes" rows="4" placeholder="Important info for next shift..." ${canEdit ? '' : 'readonly'}>${App.escapeHtml(shift.handover_notes || '')}</textarea>
+                    </div>
+                ` : ''}
+
+                ${shift.status === 'closed' && shift.endTime ? `
+                    <hr style="margin:16px 0;">
+                    <div style="font-size:0.85rem;color:var(--text-muted);">
+                        <div><strong>Shift:</strong> ${App.escapeHtml(shift.userName || '—')}</div>
+                        <div><strong>Started:</strong> ${App.formatDateTime(shift.startTime)}</div>
+                        <div><strong>Ended:</strong> ${App.formatDateTime(shift.endTime)}</div>
+                        <div><strong>Duration:</strong> ${calculateShiftDuration(shift.startTime, shift.endTime)}</div>
+                        <div><strong>Break Time:</strong> ${formatBreakDuration(shift.total_break_minutes || 0)}</div>
+                        <div><strong>Worked:</strong> ${formatBreakDuration(calculateWorkedMinutes(shift.startTime, shift.endTime, shift.total_break_minutes || 0))}</div>
+                        ${shift.endingCash !== null ? `<div><strong>Ending Cash:</strong> ${App.formatCurrency(shift.endingCash)}</div>` : ''}
+                        ${shift.cashDifference !== null ? `<div><strong>Cash Diff:</strong> ${App.formatCurrency(shift.cashDifference)}</div>` : ''}
+                    </div>
+                ` : ''}
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="App.closeModal()">Close</button>
+                ${canEdit ? `<button class="btn btn-primary" id="btnSaveShiftNotes">Save Notes</button>` : ''}
+            </div>
+        `;
+
+        App.openModal(notesHtml);
+
+        if (canEdit) {
+            document.getElementById('btnSaveShiftNotes').addEventListener('click', () => {
+                const notes = document.getElementById('shiftNotes')?.value || '';
+                const handoverNotes = document.getElementById('handoverNotes')?.value || '';
+                DB.update('shifts', shift.id, { notes, handover_notes: handoverNotes });
+                App.toast('Notes saved');
+                App.closeModal();
+                render();
+            });
+        }
+    }
+
+    function calculateShiftDuration(start, end) {
+        const diff = new Date(end) - new Date(start);
+        const hours = Math.floor(diff / 3600000);
+        const mins = Math.floor((diff % 3600000) / 60000);
+        return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+    }
+
+    function calculateWorkedMinutes(start, end, breakMinutes) {
+        const totalMinutes = Math.round((new Date(end) - new Date(start)) / 60000);
+        return Math.max(0, totalMinutes - breakMinutes);
+    }
+
+    return {
+        render,
+        getOpenShift,
+        startShift,
+        endShift,
+        getActiveBreak,
+        getShiftBreaks,
+        startBreak,
+        endBreak,
+        openShiftNotesModal,
+        startBreakTimer,
+        stopBreakTimer,
+    };
 })();

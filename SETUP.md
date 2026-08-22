@@ -102,7 +102,7 @@ BUSINESS_PAYMENT_DETAILS: {
 ## Cashier / staff login
 
 Each cashier gets their **own Supabase account** and signs in directly at
-`/index.html` — the owner never needs to log in first. Access is granted with a
+`/login.html` — the owner never needs to log in first. Access is granted with a
 one-time **invite code** (no email provider, no edge functions).
 
 How it works:
@@ -113,14 +113,14 @@ How it works:
    and the join link `…/join.html` are shown. Share them with the cashier.
 3. Cashier opens `join.html`, enters **their own email + password + the code**,
    and their account is created and linked to the business. They sign in at
-   `/index.html` with that email + password.
+   `/login.html` with that email + password.
 4. On sign-in they're in the app as themselves: admin-only pages are hidden, and
    the POS requires them to **Start Shift** (schedule rules still enforced).
    Sales they make are recorded to their shift and payroll.
 
 > **Every staff member signs in with their own account.** The old shared-register
 > "Switch User / Clock In" was removed in migration 003 — a cashier must be
-> invite-linked and log in at `/index.html` with their own email + password. This
+> invite-linked and log in at `/login.html` with their own email + password. This
 > is what makes per-user permissions enforceable server-side.
 >
 > Legacy staff rows (created before this update) have no login account yet — the

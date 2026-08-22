@@ -1,0 +1,16 @@
+{
+  "name": "ze-pos",
+  "version": "1.0.0",
+  "description": "Cloud Point of Sale — subscriptions, orders, and payroll",
+  "scripts": {
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
+  },
+  "keywords": ["pos", "point-of-sale", "restaurant"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@storybook/html": "^8.4.0",
+    "storybook": "^8.4.0"
+  }
+}

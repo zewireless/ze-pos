@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ZE-POS Customer Display">
+    <title>ZE-POS — Customer Display</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="customer-display">
+        <!-- Header -->
+        <header class="cd-header">
+            <div class="cd-brand">
+                <span class="cd-brand-mark">Z</span>
+                <span class="cd-brand-text">ZE<span class="cd-brand-accent">·</span>POS</span>
+            </div>
+            <div class="cd-store-info" id="cdStoreInfo">
+                <span class="cd-store-name" id="cdStoreName">Loading...</span>
+                <span class="cd-order-type" id="cdOrderType">Dine-In</span>
+            </div>
+        </header>
+
+        <!-- Order Items -->
+        <main class="cd-main">
+            <div class="cd-items" id="cdItems">
+                <div class="cd-empty-state">
+                    <div class="cd-empty-icon">🛒</div>
+                    <h2>No Active Order</h2>
+                    <p>Items will appear here when an order is started</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Totals Footer -->
+        <footer class="cd-footer">
+            <div class="cd-totals">
+                <div class="cd-total-row">
+                    <span class="cd-total-label">Subtotal</span>
+                    <span class="cd-total-value" id="cdSubtotal">₱0.00</span>
+                </div>
+                <div class="cd-total-row cd-tax-row" id="cdTaxRow" style="display:none;">
+                    <span class="cd-total-label" id="cdTaxLabel">Tax</span>
+                    <span class="cd-total-value" id="cdTaxAmount">₱0.00</span>
+                </div>
+                <div class="cd-total-row cd-grand-total">
+                    <span class="cd-total-label">Total</span>
+                    <span class="cd-total-value" id="cdTotal">₱0.00</span>
+                </div>
+            </div>
+            <div class="cd-payment-status" id="cdPaymentStatus">
+                <span class="cd-status-badge pending">Awaiting Payment</span>
+                <p class="cd-status-text">Please proceed to counter</p>
+            </div>
+            <div class="cd-thank-you hidden" id="cdThankYou">
+                <div class="cd-thank-icon">✓</div>
+                <h2>Thank You!</h2>
+                <p>Your order has been completed</p>
+            </div>
+        </footer>
+
+        <!-- Connection Status -->
+        <div class="cd-connection" id="cdConnection">
+            <span class="cd-connection-dot"></span>
+            <span class="cd-connection-text">Connecting...</span>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/customer-display.js"></script>
+</body>
+</html>

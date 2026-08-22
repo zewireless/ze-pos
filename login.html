@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ZE-POS">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>ZE-POS - Sign In</title>
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png" />
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="login-page">
+        <div class="login-container">
+            <div class="login-logo">🍽</div>
+            <h1 class="login-title">ZE-POS</h1>
+            <p class="login-subtitle">Cloud Point of Sale — sign in to your business</p>
+
+            <div id="loginError" class="login-error" style="display:none;">
+                Invalid email or password.
+            </div>
+
+            <form class="login-form" id="loginForm">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" placeholder="you@business.com" required autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="Enter password" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn-login" id="loginBtn">Sign In</button>
+            </form>
+
+            <div class="login-hint">
+                New to ZE-POS? <a href="register.html"><strong>Create an account</strong></a><br>
+                <span class="text-muted">Monthly subscription · GCash / Maya / bank accepted</span><br>
+                <span class="text-muted">Cashier ? <a href="join.html"><strong>Join your workplace</strong></a> with your invite code.</span><br>
+                <a href="reset-password.html" class="text-muted" style="margin-top:8px;display:inline-block;">Forgot password?</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        (async function () {
+            Supabase.init();
+
+            // Password reset recovery: if the URL has a recovery token, show the
+            // "set new password" form instead of the sign-in form.
+            const params = new URLSearchParams(window.location.hash.slice(1) || window.location.search);
+            const isRecovery = params.get('type') === 'recovery' && params.get('access_token');
+            if (isRecovery) {
+                showResetForm();
+                return;
+            }
+
+            // Already signed in? Go straight to the app.
+            const session = await Supabase.getSession();
+            if (session) {
+                const { profile } = await Supabase.getProfile();
+                if (profile) {
+                    await DB.init();
+                    await Auth.setSession(profile);
+                    window.location.href = Auth.isSuperAdmin() ? 'admin.html' : 'app.html';
+                    return;
+                }
+            }
+
+            function showResetForm() {
+                document.querySelector('.login-title').textContent = 'Set New Password';
+                document.querySelector('.login-subtitle').textContent = 'Your password reset link is valid. Enter a new password.';
+
+                const form = document.getElementById('loginForm');
+                form.innerHTML = `
+                    <div class="form-group">
+                        <label for="newPassword">New Password</label>
+                        <input type="password" id="newPassword" placeholder="At least 6 characters" required minlength="6" autocomplete="new-password">
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm Password</label>
+                        <input type="password" id="confirmPassword" placeholder="Repeat password" required autocomplete="new-password">
+                    </div>
+                    <button type="submit" class="btn-login" id="resetBtn">Update Password</button>
+                `;
+
+                document.getElementById('loginError').style.display = 'none';
+                document.querySelector('.login-hint').style.display = 'none';
+
+                document.getElementById('loginForm').addEventListener('submit', async function (e) {
+                    e.preventDefault();
+                    const newPassword = document.getElementById('newPassword').value;
+                    const confirmPassword = document.getElementById('confirmPassword').value;
+                    const errorEl = document.getElementById('loginError');
+                    const btn = document.getElementById('resetBtn');
+                    errorEl.style.display = 'none';
+
+                    if (newPassword !== confirmPassword) {
+                        errorEl.textContent = 'Passwords do not match.';
+                        errorEl.style.display = 'block';
+                        return;
+                    }
+
+                    btn.disabled = true;
+                    btn.textContent = 'Updating…';
+
+                    const { error } = await Auth.updatePassword(newPassword);
+
+                    btn.disabled = false;
+                    btn.textContent = 'Update Password';
+
+                    if (error) {
+                        errorEl.textContent = error.message || 'Could not update password.';
+                        errorEl.style.display = 'block';
+                        return;
+                    }
+
+                    errorEl.className = 'login-success';
+                    errorEl.textContent = 'Password updated! Redirecting to sign in…';
+                    errorEl.style.display = 'block';
+
+                    setTimeout(() => {
+                        window.location.href = 'index.html';
+                    }, 1500);
+                });
+            }
+
+            const errorEl = document.getElementById('loginError');
+            const btn = document.getElementById('loginBtn');
+            const countdownEl = document.createElement('div');
+            countdownEl.className = 'login-error';
+            countdownEl.style.display = 'none';
+            errorEl.parentNode.insertBefore(countdownEl, errorEl.nextSibling);
+
+            document.getElementById('loginForm').addEventListener('submit', async function (e) {
+                e.preventDefault();
+                const email = document.getElementById('email').value.trim();
+                const password = document.getElementById('password').value;
+                errorEl.style.display = 'none';
+
+                // Check lockout (client + server)
+                const check = await Lockout.preCheck('login', email);
+                if (check.locked) {
+                    Lockout.startCountdown(countdownEl, check.lockedUntil);
+                    return;
+                }
+
+                btn.disabled = true;
+                btn.textContent = 'Signing in…';
+                const { user, error } = await Auth.login(email, password);
+                btn.disabled = false;
+                btn.textContent = 'Sign In';
+
+                if (error || !user) {
+                    const rec = await Lockout.record('login', email);
+                    if (rec.locked) {
+                        Lockout.startCountdown(countdownEl, rec.lockedUntil);
+                    }
+                    errorEl.textContent = error && error.message
+                        ? error.message
+                        : 'Invalid email or password.';
+                    errorEl.style.display = 'block';
+                    return;
+                }
+
+                // Success — clear lockout on both sides
+                await Lockout.reset('login', email);
+                countdownEl.style.display = 'none';
+
+                try {
+                    await DB.init();
+                    const { profile } = await Supabase.getProfile();
+                    await Auth.setSession(profile);
+                    window.location.href = Auth.isSuperAdmin() ? 'admin.html' : 'app.html';
+                } catch (err) {
+                    errorEl.textContent = 'Could not load your workspace: ' + (err.message || err);
+                    errorEl.style.display = 'block';
+                }
+            });
+        })();
+    </script>
+</body>
+</html>
