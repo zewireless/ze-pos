@@ -2076,29 +2076,28 @@ textarea.form-control { resize: vertical; min-height: 80px; }
     border-color: var(--primary);
     box-shadow: 0 0 0 3px var(--primary-50);
 }
-/* --- Pricing Section Override --- */
+/* Pricing Grid Horizontal Layout */
 .pricing-grid {
   display: flex !important;
   flex-direction: row !important;
-  justify-content: center;
-  align-items: stretch;
-  gap: 30px;
-  margin-top: 40px;
-  width: 100%;
+  justify-content: center !important;
+  align-items: stretch !important;
+  gap: 24px !important;
+  margin-top: 40px !important;
+  width: 100% !important;
 }
 
 .pricing-card {
-  flex: 1;
-  max-width: 350px;
-  width: 100%;
-  margin-bottom: 0 !important; /* Stops bottom margins from messing up height */
+  flex: 1 1 0px !important;
+  max-width: 360px !important;
+  width: 100% !important;
 }
 
-/* Make sure they still stack nicely on mobile phones */
-@media (max-width: 991px) {
+/* Auto-stack vertically on mobile screens */
+@media (max-width: 768px) {
   .pricing-grid {
     flex-direction: column !important;
-    align-items: center;
+    align-items: center !important;
   }
 }
 /* ── Print ──────────────────────────────────────────────────── */
