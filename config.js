@@ -40,8 +40,8 @@ window.ZE_CONFIG = {
 
     // Contact you show clients for manual payments
     BUSINESS_PAYMENT_DETAILS: {
-        gcash: '09XX-XXX-XXXX (Your Name)',
-        maya: '09XX-XXX-XXXX (Your Name)',
-        bank: 'Bank: XXXX Bank / Account: 0000-0000-000',
+        gcash: '0942-3838-884 (Lounel S.)',
+        maya: '0942-3838-884 (Lounel S.)',
+        bank: 'Bank: Metrobank Bank / Account: 537-390-876-0213',
     },
 };
