@@ -625,8 +625,13 @@ const App = (() => {
 
         updateUserUI();
 
-        // Sidebar navigation (href links like the Admin Dashboard are external pages)
+        // Sidebar navigation (href links like the Admin Dashboard are external pages).
+        // Links with target="_blank" are skipped here — they're handled either by
+        // the browser's own new-tab behavior or a dedicated handler below, since
+        // this loop's e.preventDefault() + window.location.href would otherwise
+        // navigate the CURRENT tab away instead of opening a new one.
         $$('.sidebar-link').forEach(link => {
+            if (link.target === '_blank') return;
             link.addEventListener('click', (e) => {
                 e.preventDefault();
                 const href = link.getAttribute('href');
@@ -634,6 +639,20 @@ const App = (() => {
                 navigateTo(link.dataset.page);
             });
         });
+
+        // Customer Display: open in a new tab with the CURRENT store + workspace
+        // baked into the URL, so it connects to the right live cart-sync channel
+        // even if the store gets switched later (each click re-reads the latest values).
+        const cdLink = $('#navCustomerDisplay');
+        if (cdLink) {
+            cdLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                const storeId = DB.getCurrentStore();
+                const wsId = DB.getWorkspaceId();
+                const url = `customer-display.html?store=${encodeURIComponent(storeId || '')}&ws=${encodeURIComponent(wsId || '')}`;
+                window.open(url, '_blank');
+            });
+        }
 
         // Logout
         $('#btnLogout').addEventListener('click', () => Auth.logout());
