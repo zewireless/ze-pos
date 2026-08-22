@@ -2076,6 +2076,45 @@ textarea.form-control { resize: vertical; min-height: 80px; }
     border-color: var(--primary);
     box-shadow: 0 0 0 3px var(--primary-50);
 }
+
+/* ── Pop-Out Featured Card Styling ─────────────────── */
+.pricing-card.featured {
+  transform: scale(1.08) !important; /* Makes the card noticeably larger */
+  border: 2px solid #6366f1 !important; /* Glowing purple/indigo border */
+  box-shadow: 0 15px 35px rgba(99, 102, 241, 0.35) !important; /* Elevated shadow */
+  z-index: 2 !important; /* Ensures it sits above neighboring cards */
+  position: relative;
+}
+
+/* ── 🔥 Hot / Most Popular Tag Styling ─────────────── */
+.price-tag.tag-hot {
+  background: linear-gradient(135deg, #ff416c, #ff4b2b) !important; /* Vibrant fire gradient */
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  font-size: 0.85rem !important;
+  padding: 6px 14px !important;
+  border-radius: 20px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  box-shadow: 0 4px 12px rgba(255, 75, 43, 0.4) !important; /* Fire glow effect */
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Featured Button Accent */
+.pricing-card.featured .btn-primary {
+  background: linear-gradient(135deg, #6366f1, #4f46e5) !important;
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4) !important;
+}
+
+/* ── Mobile Responsive Reset ───────────────────────── */
+@media (max-width: 768px) {
+  .pricing-card.featured {
+    transform: scale(1) !important; /* Resets scale on mobile screens so it doesn't clip */
+    margin: 10px 0 !important;
+  }
+}
 /* Pricing Grid Horizontal Layout */
 .pricing-grid {
   display: flex !important;
