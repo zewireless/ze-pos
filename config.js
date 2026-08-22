@@ -42,6 +42,6 @@ window.ZE_CONFIG = {
     BUSINESS_PAYMENT_DETAILS: {
         gcash: '0942-3838-884 (Lounel S.)',
         maya: '0942-3838-884 (Lounel S.)',
-        bank: 'Bank: Metrobank Bank / Account: 537-390-876-0213',
+        bank: 'Metrobank Bank / Account: 537-390-876-0213',
     },
 };
