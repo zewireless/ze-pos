@@ -356,6 +356,22 @@ const Shifts = (() => {
                     </div>
                 `}
 
+                ${(shift.notes || shift.handover_notes) ? `
+                    <hr style="margin:20px 0;border-color:var(--border);">
+                    ${shift.notes ? `
+                        <div class="form-group">
+                            <label>Notes</label>
+                            <div class="card" style="padding:10px;font-size:0.9rem;white-space:pre-wrap;">${App.escapeHtml(shift.notes)}</div>
+                        </div>
+                    ` : ''}
+                    ${shift.handover_notes ? `
+                        <div class="form-group">
+                            <label>Handover Notes <span class="text-muted">(visible to next cashier & admins)</span></label>
+                            <div class="card" style="padding:10px;font-size:0.9rem;white-space:pre-wrap;">${App.escapeHtml(shift.handover_notes)}</div>
+                        </div>
+                    ` : ''}
+                ` : ''}
+
                 ${Auth.isAdmin() ? `
                     <hr style="margin:20px 0;border-color:var(--border);">
                     <div class="form-group">
