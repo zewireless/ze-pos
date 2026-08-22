@@ -82,7 +82,16 @@ const App = (() => {
         subscription = {
             status: b.status || b.subscription_status || 'never',
             periodEnd: b.period_end || b.current_period_end || null,
+            planName: b.plan_name || null,
+            features: b.plan_features || [],
         };
+    }
+
+    // Does the client's current plan include the named feature?
+    // (e.g. hasFeature('MultiStore')). Server-side RLS/triggers are the
+    // real enforcement — this is only for showing/hiding UI.
+    function hasFeature(name) {
+        return !!(subscription && Array.isArray(subscription.features) && subscription.features.includes(name));
     }
 
     function subscriptionActive() {
@@ -377,11 +386,19 @@ const App = (() => {
                     <span class="badge badge-info">Multi-store</span>
                 </div>
                 <div class="card-body">
+                    ${!hasFeature('MultiStore') ? `
+                    <div class="empty-state" style="margin-bottom:16px;padding:16px;border:1px dashed var(--border);border-radius:8px;">
+                        <span class="icon">🔒</span>
+                        <p style="margin:4px 0 8px;">Your current plan${subscription && subscription.planName ? ` (${escapeHtml(subscription.planName)})` : ''} only supports a single store.</p>
+                        <p class="text-muted" style="margin-bottom:12px;">Upgrade to the 499 plan (or use the Trial) to add more stores.</p>
+                        <button class="btn btn-primary btn-sm" id="btnUpgradeForStores">Upgrade Plan</button>
+                    </div>
+                    ` : ''}
                     <div class="settings-grid" style="margin-bottom:24px;">
                         <div>
                             <h4 style="margin-bottom:12px;">Your Stores</h4>
                             <div id="storeList"></div>
-                            <button class="btn btn-outline btn-sm" id="btnAddStore" style="margin-top:12px;">+ Add Store</button>
+                            ${hasFeature('MultiStore') ? `<button class="btn btn-outline btn-sm" id="btnAddStore" style="margin-top:12px;">+ Add Store</button>` : ''}
                         </div>
                         <div>
                             <h4 style="margin-bottom:12px;">Staff Assignments</h4>
@@ -510,11 +527,18 @@ const App = (() => {
         });
 
         // Add new store
+        $('#btnUpgradeForStores')?.addEventListener('click', () => {
+            navigateTo('billing');
+        });
+
         $('#btnAddStore')?.addEventListener('click', async () => {
             const name = prompt('New store name:');
             if (!name) return;
             const id = 's' + Date.now().toString(36);
                         try {
+                // Note: even if this button is somehow shown/clicked without the
+                // MultiStore feature (e.g. stale UI), the DB trigger
+                // enforce_store_plan_limit() will reject the insert.
                 await DB.upsertStore({ id, name });
                 await DB.refreshAssignedStores();
                 toast('Store created');
@@ -765,6 +789,7 @@ const App = (() => {
         escapeHtml,
         safeImageUrl,
         renderSettings,
+        hasFeature,
         $,
         $$,
     };
