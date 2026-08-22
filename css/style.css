@@ -2077,6 +2077,19 @@ textarea.form-control { resize: vertical; min-height: 80px; }
     box-shadow: 0 0 0 3px var(--primary-50);
 }
 
+.pricing-grid {
+  display: grid;
+  /* This creates 3 equal columns that wrap on smaller screens */
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem; /* Adjusts the space between the cards */
+  margin-top: 3rem; /* Adds breathing room below your header */
+  align-items: start; /* Ensures cards align nicely at the top */
+}
+
+/* Optional: Ensure the cards take up 100% of their column width */
+.pricing-card {
+  width: 100%;
+}
 /* ── Print ──────────────────────────────────────────────────── */
 .print-only { display: none; }
 @media print {
