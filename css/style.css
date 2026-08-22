@@ -2076,19 +2076,30 @@ textarea.form-control { resize: vertical; min-height: 80px; }
     border-color: var(--primary);
     box-shadow: 0 0 0 3px var(--primary-50);
 }
-
+/* --- Pricing Section Override --- */
 .pricing-grid {
-  display: grid;
-  /* This creates 3 equal columns that wrap on smaller screens */
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 2rem; /* Adjusts the space between the cards */
-  margin-top: 3rem; /* Adds breathing room below your header */
-  align-items: start; /* Ensures cards align nicely at the top */
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: center;
+  align-items: stretch;
+  gap: 30px;
+  margin-top: 40px;
+  width: 100%;
 }
 
-/* Optional: Ensure the cards take up 100% of their column width */
 .pricing-card {
+  flex: 1;
+  max-width: 350px;
   width: 100%;
+  margin-bottom: 0 !important; /* Stops bottom margins from messing up height */
+}
+
+/* Make sure they still stack nicely on mobile phones */
+@media (max-width: 991px) {
+  .pricing-grid {
+    flex-direction: column !important;
+    align-items: center;
+  }
 }
 /* ── Print ──────────────────────────────────────────────────── */
 .print-only { display: none; }
