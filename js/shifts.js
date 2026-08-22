@@ -706,14 +706,14 @@ const Shifts = (() => {
                 <button class="modal-close" onclick="App.closeModal()">✕</button>
             </div>
             <div class="modal-body" style="max-height:70vh;overflow:auto;">
-                ${shift.notes ? `
+                ${(canEdit || shift.notes) ? `
                     <div class="form-group">
                         <label>Your Notes</label>
                         <textarea class="form-control" id="shiftNotes" rows="4" placeholder="Notes for this shift..." ${canEdit ? '' : 'readonly'}>${App.escapeHtml(shift.notes || '')}</textarea>
                     </div>
                 ` : ''}
 
-                ${shift.handover_notes ? `
+                ${(canEdit || shift.handover_notes) ? `
                     <div class="form-group">
                         <label>Handover Notes <span class="text-muted">(visible to next cashier & admins)</span></label>
                         <textarea class="form-control" id="handoverNotes" rows="4" placeholder="Important info for next shift..." ${canEdit ? '' : 'readonly'}>${App.escapeHtml(shift.handover_notes || '')}</textarea>
