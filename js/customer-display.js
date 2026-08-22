@@ -361,7 +361,7 @@ const CustomerDisplay = (() => {
             .replace(/</g, '<')
             .replace(/>/g, '>')
             .replace(/"/g, '"')
-            .replace(/'/g, ''');
+            .replace(/'/g, '&#39;');
     }
 
     function formatCurrency(amount) {
