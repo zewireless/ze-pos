@@ -20,7 +20,7 @@ const DB = (() => {
     const TABLES = [
         'users', 'categories', 'menu_items', 'menu_sizes', 'condiments', 'taxes',
         'orders', 'order_items', 'shifts', 'shift_schedules', 'payrolls', 'settings',
-        'stock_movements', 'bundles', 'bundle_items',
+        'stock_movements', 'bundles', 'bundle_items', 'breaks',
     ];
 
     // public.users only grants SELECT on these columns to anon/authenticated
@@ -76,6 +76,11 @@ const DB = (() => {
         },
         bundle_items: {
             bundleId: 'bundle_id', menuItemId: 'menu_item_id', createdAt: 'created_at', storeId: 'store_id'
+        },
+        breaks: {
+            shiftId: 'shift_id', userId: 'user_id', breakType: 'break_type',
+            startTime: 'start_time', endTime: 'end_time', durationMinutes: 'duration_minutes',
+            createdAt: 'created_at', storeId: 'store_id'
         },
     };
 
