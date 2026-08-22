@@ -11,6 +11,12 @@ const POS = (() => {
     let favorites = []; // Array of menu item IDs
     const FAVORITES_KEY = 'ze-pos-favorites';
 
+    // Customer-display broadcast channel (Supabase Realtime). Scoped by
+    // workspace_id + store_id so two different businesses never land on the
+    // same channel name. Re-created lazily if the active store changes.
+    let cdChannel = null;
+    let cdChannelKey = null;
+
     // ── Keyboard Shortcuts ────────────────────────────────────────
     function initKeyboardShortcuts() {
         if (keyboardHandlerAttached) return;
@@ -929,6 +935,42 @@ const POS = (() => {
     }
 
     // ── Customer Display Sync ─────────────────────────────────────
+
+    // Lazily creates (or recreates, if the store changed) the Realtime
+    // broadcast channel used to push live cart updates to any customer-display
+    // screen — including ones on a different device, unlike localStorage.
+    function getCustomerDisplayChannel(storeId) {
+        const workspaceId = DB.getWorkspaceId();
+        if (!storeId || !workspaceId) return null;
+
+        const key = `${workspaceId}-${storeId}`;
+        if (cdChannel && cdChannelKey === key) return cdChannel;
+
+        const client = Supabase.getClient();
+        if (!client) return null;
+
+        if (cdChannel) {
+            try { client.removeChannel(cdChannel); } catch (e) { /* ignore */ }
+        }
+
+        // Intentionally not subscribing here: the POS only ever sends on this
+        // channel, never listens. Per Supabase's docs, calling send() on a
+        // channel that hasn't been subscribed automatically routes the
+        // message over the HTTP broadcast endpoint instead of WebSocket,
+        // which is exactly the fire-and-forget behavior we want.
+        cdChannel = client.channel(`cart-sync-${key}`);
+        cdChannelKey = key;
+        return cdChannel;
+    }
+
+    function broadcastToCustomerDisplay(event, payload) {
+        const storeId = DB.getCurrentStore();
+        const channel = getCustomerDisplayChannel(storeId);
+        if (!channel) return;
+        Promise.resolve(channel.send({ type: 'broadcast', event, payload: payload || {} }))
+            .catch(e => console.warn('[POS] Customer display broadcast failed:', e.message));
+    }
+
     function syncCustomerDisplay() {
         const storeId = DB.getCurrentStore();
         if (!storeId) return;
@@ -959,11 +1001,15 @@ const POS = (() => {
             timestamp: Date.now(),
         };
 
+        // Same-device fallback (instant, works even if Realtime is unreachable).
         try {
             localStorage.setItem(`cd_order_${storeId}`, JSON.stringify(orderData));
         } catch (e) {
             console.warn('[POS] Failed to sync to customer display:', e.message);
         }
+
+        // Cross-device push via Supabase Realtime.
+        broadcastToCustomerDisplay('cart_update', orderData);
     }
 
     function bindCartEvents() {
@@ -1286,10 +1332,13 @@ const POS = (() => {
             // Clear after 5 seconds
             setTimeout(() => {
                 localStorage.removeItem(`cd_order_${storeId}`);
+                broadcastToCustomerDisplay('cart_clear', {});
             }, 5000);
         } catch (e) {
             console.warn('[POS] Failed to show completion on customer display:', e.message);
         }
+
+        broadcastToCustomerDisplay('cart_update', orderData);
     }
 
     // ── Bind Events ────────────────────────────────────────────
