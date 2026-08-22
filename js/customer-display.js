@@ -6,6 +6,7 @@ const CustomerDisplay = (() => {
     let currentOrder = null;
     let supabaseChannel = null;
     let storeId = null;
+    let workspaceId = null;
     let syncMethod = 'localStorage'; // 'localStorage' or 'realtime'
     let lastSyncTime = 0;
 
@@ -44,13 +45,21 @@ const CustomerDisplay = (() => {
         elements.connectionText = elements.connection.querySelector('.cd-connection-text');
         elements.emptyState = elements.items.querySelector('.cd-empty-state');
 
-        // Get store ID from URL or localStorage
+        // This page is meant to be openable standalone on a second device with
+        // nobody signed in, so we only spin up a plain Supabase client here
+        // (needed for Realtime) — never DB.init(), which would redirect to
+        // login.html if there's no session.
+        Supabase.init();
+
+        // Get store + workspace ID from URL (preferred, set by the "Customer
+        // Display" sidebar link) or fall back to whatever was seen last on
+        // this device.
         const urlParams = new URLSearchParams(window.location.search);
         storeId = urlParams.get('store') || localStorage.getItem('cd_store_id') || DB.getCurrentStore();
+        workspaceId = urlParams.get('ws') || localStorage.getItem('cd_workspace_id') || null;
 
-        if (storeId) {
-            localStorage.setItem('cd_store_id', storeId);
-        }
+        if (storeId) localStorage.setItem('cd_store_id', storeId);
+        if (workspaceId) localStorage.setItem('cd_workspace_id', workspaceId);
 
         // Load store name
         loadStoreName();
@@ -100,22 +109,34 @@ const CustomerDisplay = (() => {
             const client = Supabase.getClient();
             if (!client) return;
 
-            // Subscribe to orders changes for this store
+            // Without a workspace id we can't build a tenant-scoped channel
+            // name — two different businesses both using store id "s1" would
+            // otherwise land on the exact same channel and see each other's
+            // live carts. In that case, stay on localStorage-only (same-device)
+            // sync rather than risk cross-tenant leakage.
+            if (!workspaceId) {
+                console.warn('[CustomerDisplay] No workspace id — open this page via the sidebar link to enable live cross-device sync.');
+                syncMethod = 'localStorage';
+                updateConnectionStatus('localStorage');
+                return;
+            }
+
+            // Live cart pushes from the POS (js/pos.js sends to this same
+            // channel name). This is a Realtime Broadcast channel — messages
+            // are not persisted, they're just relayed to current subscribers.
             supabaseChannel = client
-                .channel(`customer-display-${storeId}`)
-                .on(
-                    'postgres_changes',
-                    {
-                        event: '*',
-                        schema: 'public',
-                        table: 'orders',
-                        filter: `store_id=eq.${storeId}`,
-                    },
-                    (payload) => {
-                        console.log('[CustomerDisplay] Realtime update:', payload);
-                        handleRealtimeUpdate(payload);
-                    }
-                )
+                .channel(`cart-sync-${workspaceId}-${storeId}`)
+                .on('broadcast', { event: 'cart_update' }, ({ payload }) => {
+                    console.log('[CustomerDisplay] Broadcast cart_update:', payload);
+                    if (!payload) return;
+                    try { localStorage.setItem(`cd_order_${storeId}`, JSON.stringify(payload)); } catch (e) { /* ignore */ }
+                    displayOrder(payload);
+                })
+                .on('broadcast', { event: 'cart_clear' }, () => {
+                    console.log('[CustomerDisplay] Broadcast cart_clear');
+                    try { localStorage.removeItem(`cd_order_${storeId}`); } catch (e) { /* ignore */ }
+                    showEmptyState();
+                })
                 .subscribe((status) => {
                     console.log('[CustomerDisplay] Realtime subscription status:', status);
                     updateConnectionStatus(status === 'SUBSCRIBED' ? 'connected' : 'connecting');
@@ -126,19 +147,6 @@ const CustomerDisplay = (() => {
             console.warn('[CustomerDisplay] Realtime not available, using localStorage:', e.message);
             syncMethod = 'localStorage';
             updateConnectionStatus('localStorage');
-        }
-    }
-
-    function handleRealtimeUpdate(payload) {
-        // For customer display, we care about the latest active order
-        // The POS will write to localStorage for immediate sync
-        // This is mainly for cross-device sync
-        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            const order = payload.new;
-            if (order && (order.status === 'Pending' || order.status === 'In Progress')) {
-                // Trigger a poll to get full order with items
-                setTimeout(pollForUpdates, 100);
-            }
         }
     }
 
