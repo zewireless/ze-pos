@@ -1442,6 +1442,38 @@ const POS = (() => {
         if (endShiftBtn) {
             endShiftBtn.addEventListener('click', openEndShiftModal);
         }
+        document.querySelectorAll('[data-action="pos-start-break"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const user = Auth.currentUser();
+                const openShift = Shifts.getOpenShift(user.id);
+                if (!openShift) return;
+                const result = Shifts.startBreak(openShift.id, btn.dataset.type);
+                if (result.ok) {
+                    render();
+                } else {
+                    App.toast(result.message, 'error');
+                }
+            });
+        });
+        const endBreakBtn = document.querySelector('[data-action="pos-end-break"]');
+        if (endBreakBtn) {
+            endBreakBtn.addEventListener('click', () => {
+                const result = Shifts.endBreak(endBreakBtn.dataset.breakId);
+                if (result.ok) {
+                    render();
+                } else {
+                    App.toast(result.message, 'error');
+                }
+            });
+        }
+        const shiftNotesBtn = document.querySelector('[data-action="pos-shift-notes"]');
+        if (shiftNotesBtn) {
+            shiftNotesBtn.addEventListener('click', () => {
+                const user = Auth.currentUser();
+                const openShift = Shifts.getOpenShift(user.id);
+                if (openShift) Shifts.openShiftNotesModal(openShift);
+            });
+        }
 
         // Bind cart events
         bindCartEvents();
