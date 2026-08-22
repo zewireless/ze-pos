@@ -74,6 +74,9 @@ const DB = (() => {
         bundles: {
             createdAt: 'created_at', storeId: 'store_id'
         },
+        bundle_items: {
+            bundleId: 'bundle_id', menuItemId: 'menu_item_id', createdAt: 'created_at', storeId: 'store_id'
+        },
     };
 
     // snake_case → camelCase
