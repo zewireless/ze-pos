@@ -17,6 +17,12 @@ const MultiStoreReports = (() => {
             return;
         }
 
+        // Plan gate: only plans with the MultiStore feature (Trial, 499) get this page
+        if (!App.hasFeature('MultiStore')) {
+            el.innerHTML = '<div class="card"><div class="card-body empty-state"><span class="icon">🔒</span><h3>Upgrade Required</h3><p>Multi-store reports are available on plans that support multiple stores (Trial or the 499 plan).</p></div></div>';
+            return;
+        }
+
         const today = new Date().toISOString().split('T')[0];
         if (!filterDateFrom) {
             filterDateFrom = today;
