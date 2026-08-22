@@ -775,6 +775,7 @@ const Shifts = (() => {
         getShiftBreaks,
         startBreak,
         endBreak,
+        formatBreakDuration,
         openShiftNotesModal,
         startBreakTimer,
         stopBreakTimer,
