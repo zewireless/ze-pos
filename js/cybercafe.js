@@ -21,6 +21,13 @@ const CyberCafe = (() => {
     let stations = [];
     let pollTimer = null;
     let tickTimer = null;
+    // Set while a drag-to-reorder gesture is in progress. renderGrid()
+    // fires every second from the countdown tick — if it rebuilds the
+    // grid's innerHTML mid-drag, the browser's native drag state gets
+    // yanked out from under it and the gesture just dies. So we freeze
+    // repaints for the duration of the drag and catch up right after.
+    let isDragging = false;
+    let dragStationId = null;
 
     function render() {
         const el = document.getElementById('page-cybercafe');
@@ -130,19 +137,28 @@ const CyberCafe = (() => {
         const grid = document.getElementById('cafeStationGrid');
         if (!grid) { stopTicking(); stopPolling(); return; }
 
+        // Don't yank the DOM out from under an in-progress native drag —
+        // catch up on the next tick after it ends (see dragEnd()).
+        if (isDragging) return;
+
         if (!stations.length) {
             grid.innerHTML = `<div class="text-muted">No stations yet. ${Auth.isAdmin() ? 'Click "+ Add Station" to pair your first client PC.' : ''}</div>`;
             return;
         }
 
+        const canArrange = Auth.isAdmin() && stations.length > 1;
+
         grid.innerHTML = stations.map(s => {
             const meta = statusMeta(s);
             const offline = s.last_heartbeat && (Date.now() - new Date(s.last_heartbeat).getTime()) > 30000;
+            const canDelete = Auth.isAdmin() && s.status !== 'in_use';
             return `
-                <div class="cafe-station-card" data-station="${s.station_id}" style="border:1px solid var(--border,#333);border-radius:10px;padding:14px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;">
-                        <strong>${s.name}</strong>
+                <div class="cafe-station-card" data-station="${s.station_id}" ${canArrange ? 'draggable="true"' : ''} style="border:1px solid var(--border,#333);border-radius:10px;padding:14px;${canArrange ? 'cursor:grab;' : ''}">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+                        ${canArrange ? `<span class="text-muted" title="Drag to rearrange" style="cursor:grab;user-select:none;">⠿</span>` : ''}
+                        <strong style="flex:1;">${s.name}</strong>
                         <span class="badge" style="background:${meta.color};color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;">${meta.label}</span>
+                        ${canDelete ? `<button class="btn btn-sm" data-act="delete" title="Delete station" style="color:#e5484d;padding:0 6px;">✕</button>` : ''}
                     </div>
                     <div class="text-muted" style="font-size:12px;margin:4px 0;">${s.zone || ''} ${offline ? '· <span style="color:#e5484d;">agent offline</span>' : ''}</div>
                     ${s.status === 'in_use' ? `
@@ -164,8 +180,55 @@ const CyberCafe = (() => {
         grid.querySelectorAll('[data-act]').forEach(btn => {
             const card = btn.closest('[data-station]');
             const stationId = card.dataset.station;
-            btn.addEventListener('click', () => handleAction(btn.dataset.act, stationId));
+            btn.addEventListener('click', (e) => { e.stopPropagation(); handleAction(btn.dataset.act, stationId); });
         });
+
+        if (canArrange) wireDragAndDrop(grid);
+    }
+
+    // ── Drag-and-drop rearrange ──────────────────────────────────
+    function wireDragAndDrop(grid) {
+        grid.querySelectorAll('[data-station]').forEach(card => {
+            card.addEventListener('dragstart', (e) => {
+                isDragging = true;
+                dragStationId = card.dataset.station;
+                card.style.opacity = '0.4';
+                e.dataTransfer.effectAllowed = 'move';
+                // Firefox requires data to be set for drag to start.
+                e.dataTransfer.setData('text/plain', dragStationId);
+            });
+
+            card.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                if (!dragStationId || dragStationId === card.dataset.station) return;
+                const rect = card.getBoundingClientRect();
+                const before = (e.clientX - rect.left) < rect.width / 2;
+                card.parentElement.insertBefore(
+                    grid.querySelector(`[data-station="${dragStationId}"]`),
+                    before ? card : card.nextSibling
+                );
+            });
+
+            card.addEventListener('dragend', () => {
+                card.style.opacity = '';
+                isDragging = false;
+                const orderedIds = Array.from(grid.querySelectorAll('[data-station]')).map(c => c.dataset.station);
+                dragStationId = null;
+                persistOrder(orderedIds);
+            });
+        });
+    }
+
+    async function persistOrder(orderedIds) {
+        // Reflect the new order locally right away so a tick before the
+        // network round-trip completes doesn't snap the grid back.
+        stations.sort((a, b) => orderedIds.indexOf(a.station_id) - orderedIds.indexOf(b.station_id));
+        const client = Supabase.getClient();
+        const { error } = await client.rpc('cafe_reorder_stations', { p_station_ids: orderedIds });
+        if (error) {
+            App.toast('Could not save layout: ' + error.message, 'error');
+            load(); // fall back to server order
+        }
     }
 
     function findStation(id) { return stations.find(s => s.station_id === id); }
@@ -177,6 +240,25 @@ const CyberCafe = (() => {
         if (act === 'extend') openExtendModal(s);
         if (act === 'stop') openStopModal(s);
         if (act === 'lock') forceLock(s);
+        if (act === 'delete') deleteStation(s);
+    }
+
+    async function deleteStation(station) {
+        if (station.status === 'in_use') {
+            return App.toast('Stop the active session before deleting this station', 'error');
+        }
+        const ok = await App.confirm(
+            'Delete Station',
+            `Remove "${station.name}"? This unpairs the client PC — past sessions on it stay in your reports. This can't be undone.`,
+            'Delete',
+        );
+        if (!ok) return;
+        const client = Supabase.getClient();
+        const { error } = await client.rpc('cafe_delete_station', { p_station_id: station.station_id });
+        if (error) return App.toast(error.message, 'error');
+        stations = stations.filter(s => s.station_id !== station.station_id);
+        App.toast(`${station.name} deleted`);
+        renderGrid();
     }
 
     // ── Add station (pairing) ────────────────────────────────────
