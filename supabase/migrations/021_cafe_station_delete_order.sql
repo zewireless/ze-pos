@@ -109,8 +109,13 @@ grant execute on function public.cafe_reorder_stations(text[]) to authenticated;
 
 -- -------------------------------------------------------------
 -- 4. cafe_dashboard_state — order by saved layout instead of
---    zone/name so drag-and-drop actually sticks.
+--    zone/name so drag-and-drop actually sticks. Adds a new
+--    output column (sort_order), which Postgres won't allow via
+--    CREATE OR REPLACE on a function with OUT-param return type —
+--    it has to be dropped and recreated.
 -- -------------------------------------------------------------
+drop function if exists public.cafe_dashboard_state();
+
 create or replace function public.cafe_dashboard_state()
 returns table (
     station_id text,
