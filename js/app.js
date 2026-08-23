@@ -146,6 +146,10 @@ const App = (() => {
         }
         currentPage = page;
 
+        // Stop any background polling/timers from the page we're leaving.
+        // Safe to call even if CyberCafe was never rendered this session.
+        window.CyberCafe?.destroy?.();
+
         // Update sidebar active
         $$('.sidebar-link').forEach(link => {
             link.classList.toggle('active', link.dataset.page === page);
