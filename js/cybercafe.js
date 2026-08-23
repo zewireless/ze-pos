@@ -197,7 +197,10 @@ const CyberCafe = (() => {
             const zone = $('#cafeNewZone').value.trim() || null;
             const rate = parseFloat($('#cafeNewRate').value) || 0;
             const client = Supabase.getClient();
-            const { data, error } = await client.rpc('cafe_add_station', { p_name: name, p_zone: zone, p_hourly_rate: rate });
+            const { data, error } = await client.rpc('cafe_add_station', {
+                p_name: name, p_zone: zone, p_hourly_rate: rate,
+                p_store_id: DB.getCurrentStore(),
+            });
             if (error) return App.toast(error.message, 'error');
             const row = Array.isArray(data) ? data[0] : data;
             showPairingCode(name, row.pairing_code);
