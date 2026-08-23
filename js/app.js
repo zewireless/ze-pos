@@ -134,6 +134,7 @@ const App = (() => {
         payroll: 'Payroll',
         leaderboards: 'Leaderboards',
         multistore: 'Multi-Store Reports',
+        cybercafe: 'Internet Café',
         billing: 'Billing & Subscription',
         settings: 'Settings',
     };
@@ -223,6 +224,13 @@ const App = (() => {
                 POS.destroyKeyboardShortcuts?.();
                 MultiStoreReports.render();
                 break;
+
+             case 'cybercafe':
+                POS.destroyKeyboardShortcuts?.();
+                CyberCafe.render();
+                break;
+
+                
             case 'billing':
                 POS.destroyKeyboardShortcuts?.();
                 Billing.render();
