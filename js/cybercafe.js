@@ -21,13 +21,17 @@ const CyberCafe = (() => {
     let stations = [];
     let pollTimer = null;
     let tickTimer = null;
-    // Set while a drag-to-reorder gesture is in progress. renderGrid()
-    // fires every second from the countdown tick — if it rebuilds the
-    // grid's innerHTML mid-drag, the browser's native drag state gets
-    // yanked out from under it and the gesture just dies. So we freeze
-    // repaints for the duration of the drag and catch up right after.
+    // Set while a drag gesture is in progress. renderGrid() fires every
+    // second from the countdown tick — if it rebuilds the canvas's
+    // innerHTML mid-drag, the in-progress pointer capture / element
+    // gets yanked out from under the gesture and it just dies. So we
+    // freeze repaints for the duration of the drag and catch up right
+    // after (see pointerup handlers below).
     let isDragging = false;
-    let dragStationId = null;
+    // Admin-only mode: cards become draggable on the floor-plan canvas
+    // and the operational buttons (Start/Stop/etc.) are hidden so a
+    // slow drag doesn't accidentally fire a click on release.
+    let arrangeMode = false;
 
     function render() {
         const el = document.getElementById('page-cybercafe');
@@ -46,28 +50,46 @@ const CyberCafe = (() => {
             return;
         }
 
+        arrangeMode = false;
+
         el.innerHTML = `
             <div class="card">
                 <div class="card-header">
                     <h3>🖥 Internet Café Stations</h3>
                     <div style="display:flex;gap:10px;">
                         <button class="btn btn-outline btn-sm" id="btnCafeRefresh">↻ Refresh</button>
+                        ${Auth.isAdmin() ? `<button class="btn btn-outline btn-sm" id="btnCafeArrange">📐 Arrange Layout</button>` : ''}
                         ${Auth.isAdmin() ? `<button class="btn btn-primary btn-sm" id="btnCafeAddStation">+ Add Station</button>` : ''}
                     </div>
                 </div>
                 <div class="card-body">
-                    <div id="cafeStationGrid" class="cafe-station-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;">
-                        <div class="text-muted">Loading stations…</div>
+                    ${Auth.isAdmin() ? `<div id="cafeArrangeHint" class="text-muted" style="font-size:12px;margin-bottom:8px;display:none;">Drag each station to match where the PC actually sits in your café. Positions save automatically.</div>` : ''}
+                    <div id="cafeStationGrid" class="cafe-floor-plan" style="position:relative;min-height:420px;border:1px dashed var(--border,#333);border-radius:10px;background-image:radial-gradient(var(--border,#333) 1px, transparent 1px);background-size:24px 24px;">
+                        <div class="text-muted" style="padding:14px;">Loading stations…</div>
                     </div>
                 </div>
             </div>`;
 
         $('#btnCafeRefresh')?.addEventListener('click', load);
         $('#btnCafeAddStation')?.addEventListener('click', openAddStationModal);
+        $('#btnCafeArrange')?.addEventListener('click', toggleArrangeMode);
 
         load();
         startPolling();
         startTicking();
+    }
+
+    function toggleArrangeMode() {
+        arrangeMode = !arrangeMode;
+        const btn = $('#btnCafeArrange');
+        const hint = $('#cafeArrangeHint');
+        if (btn) {
+            btn.textContent = arrangeMode ? '✓ Done Arranging' : '📐 Arrange Layout';
+            btn.classList.toggle('btn-primary', arrangeMode);
+            btn.classList.toggle('btn-outline', !arrangeMode);
+        }
+        if (hint) hint.style.display = arrangeMode ? 'block' : 'none';
+        renderGrid();
     }
 
     function $(sel) { return document.querySelector(sel); }
@@ -133,35 +155,50 @@ const CyberCafe = (() => {
         }
     }
 
+    // Card footprint on the canvas, in px — used to clamp dragging so a
+    // card can't be dropped with its corner hanging off the edge.
+    const CARD_W = 200;
+    const CARD_H = 210;
+
     function renderGrid() {
         const grid = document.getElementById('cafeStationGrid');
         if (!grid) { stopTicking(); stopPolling(); return; }
 
-        // Don't yank the DOM out from under an in-progress native drag —
-        // catch up on the next tick after it ends (see dragEnd()).
+        // Don't yank the DOM out from under an in-progress drag — catch
+        // up on the next tick after it ends (see pointerup handler).
         if (isDragging) return;
 
         if (!stations.length) {
-            grid.innerHTML = `<div class="text-muted">No stations yet. ${Auth.isAdmin() ? 'Click "+ Add Station" to pair your first client PC.' : ''}</div>`;
+            grid.innerHTML = `<div class="text-muted" style="padding:14px;">No stations yet. ${Auth.isAdmin() ? 'Click "+ Add Station" to pair your first client PC.' : ''}</div>`;
             return;
         }
 
-        const canArrange = Auth.isAdmin() && stations.length > 1;
+        const draggable = arrangeMode && Auth.isAdmin();
 
         grid.innerHTML = stations.map(s => {
             const meta = statusMeta(s);
             const offline = s.last_heartbeat && (Date.now() - new Date(s.last_heartbeat).getTime()) > 30000;
             const canDelete = Auth.isAdmin() && s.status !== 'in_use';
+            // pos_x/pos_y are % of the canvas; fall back to a loose grid
+            // by index for any station that predates the floor-plan
+            // migration and somehow still has no position.
+            const idx = stations.indexOf(s);
+            const left = s.pos_x != null ? s.pos_x : 10 + (idx % 4) * 26;
+            const top = s.pos_y != null ? s.pos_y : 12 + Math.floor(idx / 4) * 30;
             return `
-                <div class="cafe-station-card" data-station="${s.station_id}" ${canArrange ? 'draggable="true"' : ''} style="border:1px solid var(--border,#333);border-radius:10px;padding:14px;${canArrange ? 'cursor:grab;' : ''}">
+                <div class="cafe-station-card" data-station="${s.station_id}"
+                     style="position:absolute;left:${left}%;top:${top}%;width:${CARD_W}px;
+                            border:1px solid var(--border,#333);border-radius:10px;padding:14px;
+                            background:var(--card-bg,#1a1a1a);box-shadow:0 2px 8px rgba(0,0,0,.25);
+                            ${draggable ? 'cursor:grab;touch-action:none;' : ''}">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
-                        ${canArrange ? `<span class="text-muted" title="Drag to rearrange" style="cursor:grab;user-select:none;">⠿</span>` : ''}
+                        ${draggable ? `<span title="Drag to position" style="cursor:grab;user-select:none;">⠿</span>` : ''}
                         <strong style="flex:1;">${s.name}</strong>
                         <span class="badge" style="background:${meta.color};color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;">${meta.label}</span>
-                        ${canDelete ? `<button class="btn btn-sm" data-act="delete" title="Delete station" style="color:#e5484d;padding:0 6px;">✕</button>` : ''}
+                        ${!arrangeMode && canDelete ? `<button class="btn btn-sm" data-act="delete" title="Delete station" style="color:#e5484d;padding:0 6px;">✕</button>` : ''}
                     </div>
                     <div class="text-muted" style="font-size:12px;margin:4px 0;">${s.zone || ''} ${offline ? '· <span style="color:#e5484d;">agent offline</span>' : ''}</div>
-                    ${s.status === 'in_use' ? `
+                    ${arrangeMode ? '' : s.status === 'in_use' ? `
                         <div style="font-size:28px;font-weight:700;text-align:center;margin:10px 0;">${fmtRemaining(s.expires_at)}</div>
                         <div class="text-muted" style="font-size:12px;text-align:center;">${s.customer_name || 'Walk-in'} · ₱${Number(s.rate_per_hour || 0).toFixed(2)}/hr</div>
                         <div style="display:flex;gap:6px;margin-top:10px;">
@@ -183,51 +220,73 @@ const CyberCafe = (() => {
             btn.addEventListener('click', (e) => { e.stopPropagation(); handleAction(btn.dataset.act, stationId); });
         });
 
-        if (canArrange) wireDragAndDrop(grid);
+        if (draggable) wireFloorPlanDrag(grid);
     }
 
-    // ── Drag-and-drop rearrange ──────────────────────────────────
-    function wireDragAndDrop(grid) {
+    // ── Free-form floor-plan dragging ────────────────────────────
+    // Pointer events (not HTML5 drag/drop) because we need a
+    // continuous x/y position, not just "before/after this element" —
+    // the whole point is letting the card land anywhere on the canvas
+    // to mirror where the PC actually sits in the café.
+    function wireFloorPlanDrag(grid) {
         grid.querySelectorAll('[data-station]').forEach(card => {
-            card.addEventListener('dragstart', (e) => {
-                isDragging = true;
-                dragStationId = card.dataset.station;
-                card.style.opacity = '0.4';
-                e.dataTransfer.effectAllowed = 'move';
-                // Firefox requires data to be set for drag to start.
-                e.dataTransfer.setData('text/plain', dragStationId);
-            });
-
-            card.addEventListener('dragover', (e) => {
+            card.addEventListener('pointerdown', (e) => {
+                if (e.target.closest('[data-act]')) return; // arrangeMode hides these, but just in case
                 e.preventDefault();
-                if (!dragStationId || dragStationId === card.dataset.station) return;
-                const rect = card.getBoundingClientRect();
-                const before = (e.clientX - rect.left) < rect.width / 2;
-                card.parentElement.insertBefore(
-                    grid.querySelector(`[data-station="${dragStationId}"]`),
-                    before ? card : card.nextSibling
-                );
-            });
+                isDragging = true;
+                card.setPointerCapture(e.pointerId);
+                card.style.cursor = 'grabbing';
+                card.style.zIndex = '10';
 
-            card.addEventListener('dragend', () => {
-                card.style.opacity = '';
-                isDragging = false;
-                const orderedIds = Array.from(grid.querySelectorAll('[data-station]')).map(c => c.dataset.station);
-                dragStationId = null;
-                persistOrder(orderedIds);
+                const gridRect = grid.getBoundingClientRect();
+                const startLeft = card.offsetLeft;
+                const startTop = card.offsetTop;
+                const startX = e.clientX;
+                const startY = e.clientY;
+
+                const onMove = (ev) => {
+                    const dx = ev.clientX - startX;
+                    const dy = ev.clientY - startY;
+                    const maxLeft = Math.max(0, gridRect.width - CARD_W);
+                    const maxTop = Math.max(0, gridRect.height - CARD_H);
+                    const newLeft = Math.min(maxLeft, Math.max(0, startLeft + dx));
+                    const newTop = Math.min(maxTop, Math.max(0, startTop + dy));
+                    card.style.left = newLeft + 'px';
+                    card.style.top = newTop + 'px';
+                };
+
+                const onUp = (ev) => {
+                    card.removeEventListener('pointermove', onMove);
+                    card.removeEventListener('pointerup', onUp);
+                    card.removeEventListener('pointercancel', onUp);
+                    card.style.cursor = 'grab';
+                    card.style.zIndex = '';
+                    isDragging = false;
+
+                    const pctX = (card.offsetLeft / Math.max(1, gridRect.width)) * 100;
+                    const pctY = (card.offsetTop / Math.max(1, gridRect.height)) * 100;
+                    persistPosition(card.dataset.station, pctX, pctY);
+                };
+
+                card.addEventListener('pointermove', onMove);
+                card.addEventListener('pointerup', onUp);
+                card.addEventListener('pointercancel', onUp);
             });
         });
     }
 
-    async function persistOrder(orderedIds) {
-        // Reflect the new order locally right away so a tick before the
-        // network round-trip completes doesn't snap the grid back.
-        stations.sort((a, b) => orderedIds.indexOf(a.station_id) - orderedIds.indexOf(b.station_id));
+    async function persistPosition(stationId, pctX, pctY) {
+        // Reflect it locally right away so the next tick doesn't snap
+        // the card back before the network round-trip finishes.
+        const s = findStation(stationId);
+        if (s) { s.pos_x = pctX; s.pos_y = pctY; }
         const client = Supabase.getClient();
-        const { error } = await client.rpc('cafe_reorder_stations', { p_station_ids: orderedIds });
+        const { error } = await client.rpc('cafe_update_station_position', {
+            p_station_id: stationId, p_x: pctX, p_y: pctY,
+        });
         if (error) {
-            App.toast('Could not save layout: ' + error.message, 'error');
-            load(); // fall back to server order
+            App.toast('Could not save position: ' + error.message, 'error');
+            load(); // fall back to server position
         }
     }
 
