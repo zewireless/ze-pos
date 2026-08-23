@@ -218,8 +218,16 @@ const POS = (() => {
 
     function adjustQuantity(delta) {
         if (selectedCartIndex < 0 || selectedCartIndex >= cart.length) return;
-        cart[selectedCartIndex].quantity = Math.max(1, cart[selectedCartIndex].quantity + delta);
-        cart[selectedCartIndex].lineTotal = cart[selectedCartIndex].unitPrice * cart[selectedCartIndex].quantity;
+        const ci = cart[selectedCartIndex];
+        if (delta > 0) {
+            const limit = getStockLimit(ci.itemId, ci.size);
+            if (limit !== null && cartQuantityFor(ci.itemId, ci.size, selectedCartIndex) + ci.quantity + delta > limit) {
+                App.toast(`Only ${formatStockQty(limit)} ${DB.getById('menu_items', ci.itemId)?.unit || 'pcs'} left in stock`, 'error');
+                return;
+            }
+        }
+        ci.quantity = Math.max(1, ci.quantity + delta);
+        ci.lineTotal = ci.unitPrice * ci.quantity;
         updateCart();
     }
 
@@ -700,14 +708,64 @@ const POS = (() => {
         return items;
     }
 
+    // ── Stock helpers ────────────────────────────────────────────
+    // Returns { qty, threshold } if this item's remaining stock should be
+    // shown/enforced, or null if stock isn't tracked for it. When the item
+    // itself doesn't track stock but its sizes do, qty is the sum across
+    // tracked sizes (used for the tile's summary badge only — the actual
+    // limit enforced at add-to-cart time is the specific size selected).
+    function stockBadgeFor(item) {
+        if (item.track_stock) {
+            return {
+                qty: Math.max(0, parseFloat(item.stock_quantity) || 0),
+                threshold: parseFloat(item.low_stock_threshold) || 0,
+            };
+        }
+        const trackedSizes = DB.query('menu_sizes', s => s.menuItemId === item.id && s.track_stock);
+        if (trackedSizes.length > 0) {
+            return {
+                qty: trackedSizes.reduce((sum, s) => sum + Math.max(0, parseFloat(s.stock_quantity) || 0), 0),
+                threshold: null,
+            };
+        }
+        return null;
+    }
+
+    // Remaining units available to sell for a specific item + size combo.
+    // Returns null when stock isn't tracked (i.e. unlimited).
+    function getStockLimit(itemId, sizeName) {
+        const item = DB.getById('menu_items', itemId);
+        if (!item) return null;
+        if (sizeName) {
+            const size = DB.query('menu_sizes', s => s.menuItemId === itemId && s.name === sizeName)[0];
+            if (size && size.track_stock) return Math.max(0, parseFloat(size.stock_quantity) || 0);
+        }
+        if (item.track_stock) return Math.max(0, parseFloat(item.stock_quantity) || 0);
+        return null;
+    }
+
+    // How many of this item+size are already sitting in the cart (so we
+    // don't let the cashier ring up more than what's left in stock across
+    // multiple cart lines / quantity bumps).
+    function cartQuantityFor(itemId, sizeName, excludeIdx = -1) {
+        return cart.reduce((sum, c, i) => {
+            if (i === excludeIdx) return sum;
+            return sum + (c.itemId === itemId && c.size === sizeName ? c.quantity : 0);
+        }, 0);
+    }
+
     function productCard(item) {
         const sizes = DB.query('menu_sizes', s => s.menuItemId === item.id);
         const minPrice = sizes.length ? Math.min(...sizes.map(s => parseFloat(s.price) || 0)) : 0;
         const category = DB.getById('categories', item.categoryId);
         const fav = isFavorite(item.id);
 
+        const stock = stockBadgeFor(item);
+        const isOut = !!stock && stock.qty <= 0;
+        const isLow = !!stock && stock.threshold != null && stock.qty > 0 && stock.qty <= stock.threshold;
+
         return `
-            <div class="pos-product-card" data-item-id="${item.id}">
+            <div class="pos-product-card ${isOut ? 'out-of-stock' : ''}" data-item-id="${item.id}" ${isOut ? 'data-out-of-stock="1"' : ''}>
                 <div class="pos-product-img">
                     ${App.safeImageUrl(item.image)
                         ? `<img src="${App.safeImageUrl(item.image)}" alt="${App.escapeHtml(item.name)}">`
@@ -720,8 +778,13 @@ const POS = (() => {
                 <div class="pos-product-name" title="${App.escapeHtml(item.name)}">${App.escapeHtml(item.name)}</div>
                 <div class="pos-product-price">${App.formatCurrency(minPrice)}</div>
                 ${category ? `<div class="pos-product-cat">${App.escapeHtml(category.name)}</div>` : ''}
+                ${stock ? `<div class="pos-product-stock ${isOut ? 'out' : isLow ? 'low' : ''}">${isOut ? 'Out of stock' : `${formatStockQty(stock.qty)} ${App.escapeHtml(item.unit || 'pcs')} left`}</div>` : ''}
             </div>
         `;
+    }
+
+    function formatStockQty(qty) {
+        return Number.isInteger(qty) ? String(qty) : qty.toFixed(2).replace(/\.?0+$/, '');
     }
 
     function cartItemRow(item, idx) {
@@ -894,6 +957,12 @@ const POS = (() => {
             const condTotal = selectedConds.reduce((sum, c) => sum + c.price, 0);
             const unitPrice = sizePrice + condTotal;
 
+            const limit = getStockLimit(item.id, sizeName);
+            if (limit !== null && cartQuantityFor(item.id, sizeName) + 1 > limit) {
+                App.toast(limit <= 0 ? 'This item is out of stock' : `Only ${formatStockQty(limit)} ${item.unit || 'pcs'} left in stock`, 'error');
+                return;
+            }
+
             cart.push({
                 itemId: item.id,
                 name: item.name,
@@ -1030,8 +1099,16 @@ const POS = (() => {
                 e.stopPropagation();
                 const idx = parseInt(btn.dataset.idx);
                 const delta = parseInt(btn.dataset.qty);
-                cart[idx].quantity = Math.max(1, cart[idx].quantity + delta);
-                cart[idx].lineTotal = cart[idx].unitPrice * cart[idx].quantity;
+                const ci = cart[idx];
+                if (delta > 0) {
+                    const limit = getStockLimit(ci.itemId, ci.size);
+                    if (limit !== null && cartQuantityFor(ci.itemId, ci.size, idx) + ci.quantity + delta > limit) {
+                        App.toast(`Only ${formatStockQty(limit)} ${DB.getById('menu_items', ci.itemId)?.unit || 'pcs'} left in stock`, 'error');
+                        return;
+                    }
+                }
+                ci.quantity = Math.max(1, ci.quantity + delta);
+                ci.lineTotal = ci.unitPrice * ci.quantity;
                 updateCart();
             });
         });
@@ -1058,6 +1135,19 @@ const POS = (() => {
             App.toast('Start your shift before taking orders', 'error');
             return;
         }
+
+        // Final stock guard: catch anything that went stale since items were
+        // added (e.g. someone else sold the last of it, or a manual stock
+        // adjustment happened) before we commit the sale.
+        for (const ci of cart) {
+            const limit = getStockLimit(ci.itemId, ci.size);
+            if (limit !== null && ci.quantity > limit) {
+                const itemName = DB.getById('menu_items', ci.itemId)?.name || ci.name;
+                App.toast(`Not enough stock for ${itemName} — only ${formatStockQty(limit)} left. Adjust the quantity and try again.`, 'error');
+                return;
+            }
+        }
+
         const orderNumber = DB.nextOrderNumber();
         const subtotal = cart.reduce((sum, item) => sum + item.lineTotal, 0);
         const taxInfo = getActiveTax();
@@ -1095,6 +1185,10 @@ const POS = (() => {
             });
         });
 
+        // Deduct sold quantities from stock immediately so remaining counts
+        // reflect the sale in real time (item- or size-level, whichever is tracked).
+        cart.forEach(item => deductStockForSale(item, order, user));
+
         // Show completed status on customer display
         showCompletedOnCustomerDisplay(orderNumber, total);
 
@@ -1103,8 +1197,54 @@ const POS = (() => {
 
         // Clear cart
         cart = [];
-        updateCart();
+        // Full re-render (not just updateCart) so the product grid picks up
+        // the freshly deducted stock numbers / out-of-stock states.
+        render();
         App.toast(`Order #${orderNumber} completed!`);
+    }
+
+    // Deducts a cart line's quantity from stock (size-level takes priority
+    // over item-level, mirroring how stock is tracked in Stock & Inventory),
+    // and logs a 'sale' stock movement for the audit trail. No-ops for
+    // items/sizes that don't have stock tracking enabled.
+    function deductStockForSale(cartItem, order, user) {
+        const item = DB.getById('menu_items', cartItem.itemId);
+        if (!item) return;
+
+        const size = cartItem.size
+            ? DB.query('menu_sizes', s => s.menuItemId === item.id && s.name === cartItem.size)[0]
+            : null;
+
+        let menuItemId = item.id;
+        let menuSizeId = null;
+        let prevQty, newQty;
+
+        if (size && size.track_stock) {
+            prevQty = parseFloat(size.stock_quantity) || 0;
+            newQty = Math.max(0, prevQty - cartItem.quantity);
+            DB.update('menu_sizes', size.id, { stock_quantity: newQty });
+            menuSizeId = size.id;
+        } else if (item.track_stock) {
+            prevQty = parseFloat(item.stock_quantity) || 0;
+            newQty = Math.max(0, prevQty - cartItem.quantity);
+            DB.update('menu_items', item.id, { stock_quantity: newQty });
+        } else {
+            return; // stock not tracked for this item/size — nothing to deduct
+        }
+
+        DB.insert('stock_movements', {
+            menuItemId,
+            menuSizeId,
+            movementType: 'sale',
+            quantityChange: -(prevQty - newQty),
+            previousQuantity: prevQty,
+            newQuantity: newQty,
+            referenceId: order.id,
+            referenceType: 'order',
+            notes: `Auto-deducted from order #${order.orderNumber}`,
+            userId: user.id,
+            userName: user.name,
+        });
     }
 
     // ── Split Bill ─────────────────────────────────────────────
@@ -1348,6 +1488,10 @@ const POS = (() => {
             card.addEventListener('click', (e) => {
                 // Don't open modal if clicking on favorite toggle
                 if (e.target.closest('.pos-favorite-toggle')) return;
+                if (card.dataset.outOfStock) {
+                    App.toast('This item is out of stock', 'error');
+                    return;
+                }
                 openItemModal(card.dataset.itemId);
             });
         });
@@ -1396,6 +1540,10 @@ const POS = (() => {
                 document.querySelectorAll('.pos-product-card').forEach(card => {
                     card.addEventListener('click', (e) => {
                         if (e.target.closest('.pos-favorite-toggle')) return;
+                        if (card.dataset.outOfStock) {
+                            App.toast('This item is out of stock', 'error');
+                            return;
+                        }
                         openItemModal(card.dataset.itemId);
                     });
                 });
@@ -1533,6 +1681,12 @@ const POS = (() => {
         const sizePrice = selectedSize ? parseFloat(selectedSize.price) || 0 : 0;
         const unitPrice = sizePrice;
         const lineTotal = unitPrice;
+
+        const limit = getStockLimit(itemId, sizeName);
+        if (limit !== null && cartQuantityFor(itemId, sizeName) + 1 > limit) {
+            App.toast(limit <= 0 ? 'This item is out of stock' : `Only ${formatStockQty(limit)} ${item.unit || 'pcs'} left in stock`, 'error');
+            return;
+        }
 
         cart.push({
             itemId: item.id,
