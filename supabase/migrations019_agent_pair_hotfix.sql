@@ -25,10 +25,10 @@ begin
         raise exception 'invalid or expired pairing code';
     end if;
 
-    update public.stations
+    update public.stations st
        set agent_token = v_token, pairing_code = null, pairing_expires_at = null,
            status = 'available', last_heartbeat = now()
-     where workspace_id = v_station.workspace_id and id = v_station.id;
+     where st.workspace_id = v_station.workspace_id and st.id = v_station.id;
 
     return query select v_station.workspace_id, v_station.id, v_token;
 end;
