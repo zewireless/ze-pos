@@ -192,9 +192,10 @@ const DB = (() => {
         return getStoreRows(table).length;
     }
 
-    function clear(table) {
-        cache[table] = (cache[table] || []).filter(r => r.storeId !== currentStoreId);
-    }
+function clear(table) {
+    cache[table] = (cache[table] || []).filter(r => r.storeId !== currentStoreId);
+    enqueueWrite('clear', table, null);
+}
 
     function resetAll() {
         TABLES.forEach(t => clear(t));
