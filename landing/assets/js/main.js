@@ -268,6 +268,16 @@
   const success = document.getElementById("formSuccess");
   const resetBtn = document.getElementById("formReset");
 
+  const CONTACT_EMAIL = "ev.lounel4195@gmail.com";
+  const TOPIC_LABELS = {
+    trial: "Start a free trial",
+    demo: "Book a live demo",
+    pricing: "Pricing & plans",
+    support: "Technical support",
+    partnership: "Partnership / reseller",
+    other: "Something else",
+  };
+
   const emailOk = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
   const setError = (el, msg) => {
@@ -315,6 +325,28 @@
         ok = false;
       }
       if (!ok) return;
+
+      // No backend on this static site — hand off to the visitor's own
+      // email client via mailto:, pre-addressed and pre-filled, so the
+      // inquiry actually reaches CONTACT_EMAIL instead of vanishing.
+      const topicLabel = TOPIC_LABELS[topic.value] || topic.value;
+      const business = form.business.value.trim();
+      const phone = form.phone.value.trim();
+      const subject = `ZE-POS inquiry: ${topicLabel}`;
+      const bodyLines = [
+        `Name: ${name.value.trim()}`,
+        `Email: ${email.value.trim()}`,
+        business ? `Business: ${business}` : null,
+        phone ? `Phone: ${phone}` : null,
+        `Topic: ${topicLabel}`,
+        "",
+        message.value.trim(),
+      ].filter((l) => l !== null);
+      const mailtoUrl =
+        `mailto:${CONTACT_EMAIL}` +
+        `?subject=${encodeURIComponent(subject)}` +
+        `&body=${encodeURIComponent(bodyLines.join("\n"))}`;
+      window.location.href = mailtoUrl;
 
       const reply = document.getElementById("replyEmail");
       if (reply) reply.textContent = email.value.trim();
