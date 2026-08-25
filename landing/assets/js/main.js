@@ -268,7 +268,7 @@
   const success = document.getElementById("formSuccess");
   const resetBtn = document.getElementById("formReset");
 
-  const CONTACT_EMAIL = "ev.lounel4195@gmail.com";
+  const CONTACT_EMAIL = "ze.pos.official@gmail.com";
   const TOPIC_LABELS = {
     trial: "Start a free trial",
     demo: "Book a live demo",
