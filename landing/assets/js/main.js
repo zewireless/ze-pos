@@ -269,6 +269,7 @@
   const resetBtn = document.getElementById("formReset");
 
   const CONTACT_EMAIL = "ze.pos.official@gmail.com";
+  const WEB3FORMS_ACCESS_KEY = "405b843e-98c5-4ebe-a24e-6732d38a700b";
   const TOPIC_LABELS = {
     trial: "Start a free trial",
     demo: "Book a live demo",
@@ -326,32 +327,59 @@
       }
       if (!ok) return;
 
-      // No backend on this static site — hand off to the visitor's own
-      // email client via mailto:, pre-addressed and pre-filled, so the
-      // inquiry actually reaches CONTACT_EMAIL instead of vanishing.
+      // Real server-side delivery via Web3Forms — no backend of our own
+      // needed, and it works regardless of whether the visitor has a
+      // mail client configured (unlike mailto:).
       const topicLabel = TOPIC_LABELS[topic.value] || topic.value;
       const business = form.business.value.trim();
       const phone = form.phone.value.trim();
-      const subject = `ZE-POS inquiry: ${topicLabel}`;
-      const bodyLines = [
-        `Name: ${name.value.trim()}`,
-        `Email: ${email.value.trim()}`,
-        business ? `Business: ${business}` : null,
-        phone ? `Phone: ${phone}` : null,
-        `Topic: ${topicLabel}`,
-        "",
-        message.value.trim(),
-      ].filter((l) => l !== null);
-      const mailtoUrl =
-        `mailto:${CONTACT_EMAIL}` +
-        `?subject=${encodeURIComponent(subject)}` +
-        `&body=${encodeURIComponent(bodyLines.join("\n"))}`;
-      window.location.href = mailtoUrl;
+      const submitBtn = form.querySelector('button[type="submit"]');
+      const originalBtnText = submitBtn ? submitBtn.textContent : "";
 
-      const reply = document.getElementById("replyEmail");
-      if (reply) reply.textContent = email.value.trim();
-      form.style.visibility = "hidden";
-      if (success) success.classList.remove("hidden");
+      const payload = {
+        access_key: WEB3FORMS_ACCESS_KEY,
+        subject: `ZE-POS inquiry: ${topicLabel}`,
+        from_name: name.value.trim(),
+        name: name.value.trim(),
+        email: email.value.trim(),
+        business: business || "(not provided)",
+        phone: phone || "(not provided)",
+        topic: topicLabel,
+        message: message.value.trim(),
+      };
+
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Sending...";
+      }
+
+      fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(payload),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalBtnText;
+          }
+          if (data.success) {
+            const reply = document.getElementById("replyEmail");
+            if (reply) reply.textContent = email.value.trim();
+            form.style.visibility = "hidden";
+            if (success) success.classList.remove("hidden");
+          } else {
+            setError(message, "Couldn't send right now — please email us directly.");
+          }
+        })
+        .catch(() => {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalBtnText;
+          }
+          setError(message, "Couldn't send right now — please email us directly.");
+        });
     });
 
     if (resetBtn) {
