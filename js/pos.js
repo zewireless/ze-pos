@@ -10,6 +10,10 @@ const POS = (() => {
     let keyboardHandlerAttached = false;
     let favorites = []; // Array of menu item IDs
     const FAVORITES_KEY = 'ze-pos-favorites';
+    // On phone-width screens, only one of Menu/Cart is shown at a time
+    // (toggled via a floating "View Cart" bar) so each gets full height
+    // instead of a cramped 50/50 split. Has no effect above 768px.
+    let mobileView = 'products';
 
     // Customer-display broadcast channel (Supabase Realtime). Scoped by
     // workspace_id + store_id so two different businesses never land on the
@@ -349,6 +353,13 @@ const POS = (() => {
         `;
     }
 
+    // ── Mobile view helpers ──────────────────────────────────────
+    function mobileCartBarText() {
+        const count = cart.reduce((s, i) => s + i.quantity, 0);
+        const total = cart.reduce((s, i) => s + i.lineTotal, 0);
+        return `🛒 View Cart · ${count} item${count !== 1 ? 's' : ''} · ${App.formatCurrency(total)}`;
+    }
+
     function render() {
         loadFavorites();
         const el = document.getElementById('page-pos');
@@ -376,7 +387,7 @@ const POS = (() => {
 
         el.innerHTML = `
             ${renderShiftBar(openShift, shiftOrderCount, shiftTotalSales)}
-            <div class="pos-layout">
+            <div class="pos-layout ${mobileView === 'cart' ? 'mobile-cart-view' : ''}">
                 <!-- Left: Products -->
                 <div class="pos-products">
                     <div class="pos-categories-bar">
@@ -395,11 +406,16 @@ const POS = (() => {
                             : items.map(item => productCard(item)).join('')
                         }
                     </div>
+                    <button class="mobile-cart-bar ${cart.length === 0 ? 'hidden' : ''}" id="mobileCartBar">
+                        <span id="mobileCartBarText">${mobileCartBarText()}</span>
+                        <span class="mobile-cart-bar-arrow">→</span>
+                    </button>
                 </div>
 
                 <!-- Right: Cart -->
                 <div class="pos-cart">
                     <div class="pos-cart-header">
+                        <button class="btn-back-menu" id="btnBackToMenu" aria-label="Back to menu">←</button>
                         <h3>Current Order</h3>
                         <span class="pos-cart-count" id="cartCount">${cart.length}</span>
                     </div>
@@ -999,6 +1015,22 @@ const POS = (() => {
         if (completeBtn) completeBtn.disabled = cart.length === 0;
         updateCartSelection();
 
+        // Keep the mobile "View Cart" floating bar in sync too, since this
+        // function (not the full render()) handles qty +/- and remove.
+        const mobileBar = document.getElementById('mobileCartBar');
+        if (mobileBar) {
+            mobileBar.classList.toggle('hidden', cart.length === 0);
+            const textEl = document.getElementById('mobileCartBarText');
+            if (textEl) textEl.textContent = mobileCartBarText();
+        }
+        // If the cart just emptied out while the phone was showing the
+        // cart panel, drop back to the menu automatically.
+        if (cart.length === 0 && mobileView === 'cart') {
+            mobileView = 'products';
+            render();
+            return;
+        }
+
         // Sync to customer display
         syncCustomerDisplay();
     }
@@ -1197,6 +1229,7 @@ const POS = (() => {
 
         // Clear cart
         cart = [];
+        mobileView = 'products';
         // Full re-render (not just updateCart) so the product grid picks up
         // the freshly deducted stock numbers / out-of-stock states.
         render();
@@ -1574,6 +1607,23 @@ const POS = (() => {
                 btn.classList.add('active');
             });
         });
+
+        // Mobile view toggle: floating "View Cart" bar → switch to cart
+        const mobileCartBar = document.getElementById('mobileCartBar');
+        if (mobileCartBar) {
+            mobileCartBar.addEventListener('click', () => {
+                mobileView = 'cart';
+                render();
+            });
+        }
+        // Mobile view toggle: "← Back to Menu" in cart header
+        const backToMenuBtn = document.getElementById('btnBackToMenu');
+        if (backToMenuBtn) {
+            backToMenuBtn.addEventListener('click', () => {
+                mobileView = 'products';
+                render();
+            });
+        }
 
         // Complete order
         document.getElementById('btnCompleteOrder').addEventListener('click', completeOrder);
