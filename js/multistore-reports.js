@@ -176,11 +176,11 @@ const MultiStoreReports = (() => {
             <!-- Top Performer Banner -->
             ${topStore ? `
                 <div class="card" style="margin-bottom:20px;background:linear-gradient(135deg, var(--primary-50) 0%, var(--bg) 100%);border:2px solid var(--primary);">
-                    <div class="card-body" style="display:flex;align-items:center;gap:20px;">
-                        <div style="width:60px;height:60px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:2rem;color:white;">
+                    <div class="card-body" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+                        <div style="width:60px;height:60px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:2rem;color:white;flex-shrink:0;">
                             🏆
                         </div>
-                        <div style="flex:1;">
+                        <div style="flex:1;min-width:0;">
                             <div class="text-muted" style="font-size:0.85rem;margin-bottom:4px;">Top Performing Store</div>
                             <h3 style="margin:0 0 8px;">${App.escapeHtml(topStore.name)}</h3>
                             <div style="display:flex;gap:12px;flex-wrap:wrap;">
