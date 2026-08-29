@@ -30,7 +30,7 @@ const DB = (() => {
     // bare '*' against `users` always 403s (42501) even though the column
     // grant covers everything the app actually needs. Every hydration of the
     // `users` table must use this explicit list instead of '*'.
-    const USERS_SAFE_COLUMNS = 'workspace_id,store_id,id,username,name,role,enabled,pay_type,hourly_rate,fixed_salary,created_at,auth_uid';
+    const USERS_SAFE_COLUMNS = 'workspace_id,store_id,id,username,name,role,enabled,pay_type,hourly_rate,fixed_salary,manager_pin,created_at,auth_uid';
 
     function selectColsFor(table) {
         return table === 'users' ? USERS_SAFE_COLUMNS : '*';
@@ -359,7 +359,14 @@ const DB = (() => {
         const seedErr = await Supabase.seedWorkspace();
         if (seedErr) console.warn('seed_workspace:', seedErr.message || seedErr);
 
-        // 7. Hydrate cache for current store only (other stores loaded on demand)
+        // 7. Flush any writes left over from a previous session BEFORE
+        // pulling fresh data — otherwise a write that was still in-flight
+        // when the page was refreshed/closed gets silently wiped out by
+        // step 8's hydration, which always reflects whatever's on the
+        // server at that moment (i.e. not-yet-synced local changes).
+        await processOutbox();
+
+        // 8. Hydrate cache for current store only (other stores loaded on demand)
         await Promise.all(TABLES.map(async (table) => {
             const { data, error } = await client
                 .from(table)
@@ -370,7 +377,6 @@ const DB = (() => {
             cache[table] = (data || []).map(r => fromDb(table, r));
         }));
 
-        processOutbox();
         return true;
     }
 
@@ -502,6 +508,12 @@ async function refreshAssignedStores() {
     return {
         generateId,
         init,
+        // Lets a caller explicitly wait for pending background writes to
+        // actually reach Supabase — needed right before any server-side
+        // check (like an RPC) that depends on a just-inserted row already
+        // existing there (insert()/update() themselves stay synchronous
+        // and fire-and-forget, so most callers don't need this).
+        flushOutbox: processOutbox,
         getWorkspaceId,
         getCurrentStore,
         getAssignedStores,

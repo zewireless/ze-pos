@@ -220,6 +220,7 @@ const Staff = (() => {
         updatePayVisibility();
 
         document.getElementById('btnSaveStaff').addEventListener('click', async () => {
+            const btnSave = document.getElementById('btnSaveStaff');
             const name = document.getElementById('staffName').value.trim();
             const username = document.getElementById('staffUsername').value.trim();
             const role = document.getElementById('staffRole').value;
@@ -283,6 +284,13 @@ const Staff = (() => {
                     console.warn('Auto-assign store failed:', e.message);
                 }
                 DB.logAction('staff_add', 'users', rec.id, { name, username, role, payType });
+                // Make sure the new row has actually reached Supabase before
+                // the admin can click "Invite" on it — that check runs
+                // server-side and fails with "Staff member not found" if
+                // this row isn't there yet.
+                btnSave.disabled = true;
+                btnSave.textContent = 'Saving...';
+                await DB.flushOutbox();
                 App.toast('Staff member added. Click 🔗 Invite to give them sign-in access.');
             }
 
@@ -298,7 +306,16 @@ const Staff = (() => {
         if (!user) return;
 
         const client = Supabase.getClient();
-        const { data: code, error } = await client.rpc('create_workspace_invite', { p_user_id: id });
+        let { data: code, error } = await client.rpc('create_workspace_invite', { p_user_id: id });
+
+        // If the server doesn't see this row yet, it's almost certainly a
+        // background write that hasn't landed — flush it and retry once
+        // before surfacing an error to the admin.
+        if (error && /not found/i.test(error.message || '')) {
+            await DB.flushOutbox();
+            ({ data: code, error } = await client.rpc('create_workspace_invite', { p_user_id: id }));
+        }
+
         if (error) {
             App.toast(error.message || 'Could not generate invite', 'error');
             return;
