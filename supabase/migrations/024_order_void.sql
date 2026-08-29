@@ -21,3 +21,14 @@ alter table public.orders
 -- Stored per-user; blank/null means that admin can't authorize voids.
 alter table public.users
     add column if not exists manager_pin text;
+
+-- public.users has a column-level SELECT grant (see 008_users_grant_fix.sql)
+-- rather than a blanket grant, to keep the password hash out of client
+-- reach. Any new column added here must be added to that grant too, or
+-- the client can write it fine but it silently disappears on next
+-- refresh (DB.init() re-hydrates via an explicit column list that
+-- wouldn't include it, and PostgREST won't return an ungranted column).
+grant select (
+    workspace_id, store_id, id, username, name, role, enabled,
+    pay_type, hourly_rate, fixed_salary, manager_pin, created_at, auth_uid
+) on public.users to anon, authenticated;
