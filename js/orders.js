@@ -79,6 +79,11 @@ const Orders = (() => {
             });
         });
 
+        // Void order (see canVoidOrder() for who's allowed, on which orders)
+        el.querySelectorAll('[data-action="void"]').forEach(btn => {
+            btn.addEventListener('click', () => openVoidModal(btn.dataset.id));
+        });
+
         // Delete single order (admin only)
         el.querySelectorAll('[data-action="delete"]').forEach(btn => {
             btn.addEventListener('click', () => deleteOrder(btn.dataset.id));
@@ -135,6 +140,155 @@ const Orders = (() => {
         }
 
         return orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
+
+    // ── Void Order ───────────────────────────────────────────
+    // Admins can void any completed order, any time. Cashiers can only
+    // void an order that belongs to their own currently-open shift, and
+    // must enter an admin's Manager PIN to authorize it. Voiding never
+    // deletes the order — it's marked "Voided" (kept for the audit
+    // trail/history) and excluded from revenue everywhere else in the
+    // app, and any stock it deducted is restored.
+    function canVoidOrder(order) {
+        if (order.status !== 'Completed') return false;
+        if (Auth.isAdmin()) return true;
+        const user = Auth.currentUser();
+        const openShift = Shifts.getOpenShift(user.id);
+        return !!openShift && order.shiftId === openShift.id;
+    }
+
+    function openVoidModal(id) {
+        const order = DB.getById('orders', id);
+        if (!order || !canVoidOrder(order)) return;
+        const isAdmin = Auth.isAdmin();
+
+        App.openModal(`
+            <div class="modal-header">
+                <h3>↩️ Void Order #${order.orderNumber}</h3>
+                <button class="modal-close" onclick="App.closeModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted" style="margin-bottom:16px;">
+                    This marks the order as <strong>Voided</strong> — it's removed from sales totals and any stock it deducted is put back. The order stays in history for your records; it isn't deleted.
+                </p>
+                <div class="form-group">
+                    <label>Reason <span class="required">*</span></label>
+                    <textarea class="form-control" id="voidReason" rows="3" placeholder="e.g. Wrong item rung up, customer changed order..."></textarea>
+                </div>
+                ${!isAdmin ? `
+                <div class="form-group">
+                    <label>Admin PIN <span class="required">*</span></label>
+                    <input type="password" inputmode="numeric" maxlength="6" class="form-control" id="voidPin" placeholder="Ask a manager for their PIN">
+                </div>
+                ` : ''}
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="App.closeModal()">Cancel</button>
+                <button class="btn btn-danger" id="btnConfirmVoid">Void Order</button>
+            </div>
+        `);
+
+        document.getElementById('btnConfirmVoid').addEventListener('click', () => voidOrder(id, isAdmin));
+    }
+
+    function voidOrder(id, isAdmin) {
+        const order = DB.getById('orders', id);
+        if (!order || !canVoidOrder(order)) {
+            App.toast('This order can no longer be voided', 'error');
+            App.closeModal();
+            return;
+        }
+
+        const reason = document.getElementById('voidReason').value.trim();
+        if (!reason) {
+            App.toast('A reason is required to void an order', 'error');
+            return;
+        }
+
+        const user = Auth.currentUser();
+        let authorizedBy = user.name;
+
+        if (!isAdmin) {
+            const pin = document.getElementById('voidPin').value.trim();
+            if (!pin) {
+                App.toast('Admin PIN is required', 'error');
+                return;
+            }
+            const admin = DB.query('users', u => u.role === 'admin' && u.enabled !== false && u.managerPin && u.managerPin === pin)[0];
+            if (!admin) {
+                App.toast('Incorrect PIN', 'error');
+                return;
+            }
+            authorizedBy = admin.name;
+        }
+
+        // Restore stock for every line item that had stock tracking enabled
+        const items = DB.query('order_items', i => i.orderId === id);
+        items.forEach(item => restoreStockForVoid(item, order, user));
+
+        DB.update('orders', id, {
+            status: 'Voided',
+            voidedAt: new Date().toISOString(),
+            voidedBy: user.name,
+            voidAuthorizedBy: authorizedBy,
+            voidReason: reason,
+        });
+
+        DB.logAction('order_void', 'orders', id, {
+            orderNumber: order.orderNumber,
+            total: order.total,
+            reason,
+            voidedBy: user.name,
+            authorizedBy,
+        });
+
+        App.toast(`Order #${order.orderNumber} voided`);
+        App.closeModal();
+        render();
+    }
+
+    // Mirrors POS.deductStockForSale() in reverse — adds the sold quantity
+    // back to whichever level (size or item) stock was actually tracked
+    // at, and logs a 'void' stock movement for the audit trail. No-ops
+    // for items/sizes that don't track stock.
+    function restoreStockForVoid(orderItem, order, user) {
+        const item = DB.getById('menu_items', orderItem.menuItemId);
+        if (!item) return;
+
+        const size = orderItem.size
+            ? DB.query('menu_sizes', s => s.menuItemId === item.id && s.name === orderItem.size)[0]
+            : null;
+
+        let menuItemId = item.id;
+        let menuSizeId = null;
+        let prevQty, newQty;
+
+        if (size && size.track_stock) {
+            prevQty = parseFloat(size.stock_quantity) || 0;
+            newQty = prevQty + orderItem.quantity;
+            DB.update('menu_sizes', size.id, { stock_quantity: newQty });
+            menuSizeId = size.id;
+        } else if (item.track_stock) {
+            prevQty = parseFloat(item.stock_quantity) || 0;
+            newQty = prevQty + orderItem.quantity;
+            DB.update('menu_items', item.id, { stock_quantity: newQty });
+        } else {
+            return;
+        }
+
+        DB.insert('stock_movements', {
+            menuItemId,
+            menuSizeId,
+            movementType: 'return',
+            quantityChange: newQty - prevQty,
+            previousQuantity: prevQty,
+            newQuantity: newQty,
+            referenceId: order.id,
+            referenceType: 'order',
+            notes: `Restored — order #${order.orderNumber} voided`,
+            userId: user.id,
+            userName: user.name,
+        });
     }
 
     async function deleteOrder(id) {
@@ -194,9 +348,9 @@ const Orders = (() => {
                             const items = DB.query('order_items', i => i.orderId === o.id);
                             const isSelected = selectedOrders.includes(o.id);
                             return `
-                                <tr class="${isSelected ? 'row-selected' : ''}">
-                                    <td><input type="checkbox" data-action="select" data-id="${o.id}" ${isSelected ? 'checked' : ''}></td>
-                                    <td><strong>#${o.orderNumber}</strong></td>
+                                <tr class="${isSelected ? 'row-selected' : ''}" style="${o.status === 'Voided' ? 'opacity:0.6;' : ''}">
+                                    <td><input type="checkbox" data-action="select" data-id="${o.id}" ${isSelected ? 'checked' : ''} ${o.status === 'Voided' ? 'disabled' : ''}></td>
+                                    <td><strong>#${o.orderNumber}</strong> ${o.status === 'Voided' ? '<span class="badge badge-danger" title="'+App.escapeHtml(o.voidReason || '')+'">Voided</span>' : ''}</td>
                                     <td><span class="badge badge-info">${App.escapeHtml(o.type)}</span></td>
                                     <td>${items.reduce((sum, i) => sum + (i.quantity || 1), 0)} item(s)</td>
                                     <td>${App.formatCurrency(o.subtotal)}</td>
@@ -208,6 +362,7 @@ const Orders = (() => {
                                         <div class="btn-group" style="justify-content:flex-end;">
                                             <button class="btn btn-outline btn-sm" data-action="view" data-id="${o.id}">View</button>
                                             <button class="btn btn-ghost btn-sm" data-action="print" data-id="${o.id}" title="Print Receipt">🖨</button>
+                                            ${canVoidOrder(o) ? `<button class="btn btn-ghost btn-sm" data-action="void" data-id="${o.id}" title="Void Order" style="color:var(--danger);">↩️</button>` : ''}
                                             ${Auth.isAdmin() ? `<button class="btn btn-ghost btn-sm" data-action="delete" data-id="${o.id}" title="Delete Order" style="color:var(--danger);">🗑</button>` : ''}
                                         </div>
                                     </td>
@@ -233,10 +388,17 @@ const Orders = (() => {
             <div class="modal-body">
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
                     <div><strong>Type:</strong> <span class="badge badge-info">${App.escapeHtml(order.type)}</span></div>
-                    <div><strong>Status:</strong> <span class="badge badge-success">${App.escapeHtml(order.status)}</span></div>
+                    <div><strong>Status:</strong> <span class="badge ${order.status === 'Voided' ? 'badge-danger' : 'badge-success'}">${App.escapeHtml(order.status)}</span></div>
                     <div><strong>Date:</strong> ${App.formatDateTime(order.createdAt)}</div>
                     <div><strong>Cashier:</strong> ${App.escapeHtml(order.userName || '—')}</div>
                 </div>
+                ${order.status === 'Voided' ? `
+                <div style="background:#fee2e2;border:1px solid #fecaca;border-radius:var(--radius);padding:12px;margin-bottom:16px;">
+                    <div><strong>Voided by:</strong> ${App.escapeHtml(order.voidedBy || '—')} ${order.voidAuthorizedBy && order.voidAuthorizedBy !== order.voidedBy ? `(authorized by ${App.escapeHtml(order.voidAuthorizedBy)})` : ''}</div>
+                    <div><strong>When:</strong> ${order.voidedAt ? App.formatDateTime(order.voidedAt) : '—'}</div>
+                    <div><strong>Reason:</strong> ${App.escapeHtml(order.voidReason || '—')}</div>
+                </div>
+                ` : ''}
                 <hr style="border:none;border-top:1px solid var(--border);margin:12px 0;">
                 <h4 style="margin-bottom:8px;">Items</h4>
                 ${items.map(item => `
@@ -262,6 +424,7 @@ const Orders = (() => {
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline" onclick="App.closeModal()">Close</button>
+                ${canVoidOrder(order) ? `<button class="btn btn-danger" onclick="App.closeModal();Orders.openVoidModal('${id}');">↩️ Void Order</button>` : ''}
                 <button class="btn btn-primary" onclick="Receipt.show(DB.getById('orders','${id}'));App.closeModal();">🖨 Print Receipt</button>
             </div>
         `);
@@ -417,5 +580,5 @@ const Orders = (() => {
         render();
     }
 
-    return { render };
+    return { render, openVoidModal };
 })();

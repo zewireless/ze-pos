@@ -99,7 +99,7 @@ const Reports = (() => {
 
     // ── shell (filters + summary + containers, no data yet) ────
     function renderShell(el, today) {
-        const orders = loadedOrders;
+        const orders = loadedOrders.filter(o => o.status !== 'Voided');
         const summary = calcSummary(orders);
         const daysInRange = filterDateFrom && filterDateTo
             ? Math.round((new Date(`${filterDateTo}T23:59:59`) - new Date(`${filterDateFrom}T00:00:00`)) / 86400000) + 1
@@ -143,7 +143,7 @@ const Reports = (() => {
                             <div class="stat-icon blue">📦</div>
                             <div class="stat-info">
                                 <div class="stat-label">Orders (loaded)</div>
-                                <div class="stat-value" id="rptCount">${loadedOrders.length}</div>
+                                <div class="stat-value" id="rptCount">${orders.length}</div>
                             </div>
                         </div>
                         <div class="stat-card">
@@ -176,7 +176,10 @@ const Reports = (() => {
 
     // ── results (after data loaded) ─────────────────────────────
     function renderResults(el) {
-        const orders = loadedOrders;
+        // This is a revenue report, not an audit log — voided sales are
+        // excluded outright (Order History is where voided orders remain
+        // visible for the audit trail).
+        const orders = loadedOrders.filter(o => o.status !== 'Voided');
         const summary = calcSummary(orders);
 
         // Update summary stat cards in place
@@ -185,7 +188,7 @@ const Reports = (() => {
         const avg = document.getElementById('rptAvg');
         const tax = document.getElementById('rptTax');
         if (rev) rev.textContent = App.formatCurrency(summary.revenue);
-        if (cnt) cnt.textContent = loadedOrders.length;
+        if (cnt) cnt.textContent = orders.length;
         if (avg) avg.textContent = summary.orderCount > 0 ? App.formatCurrency(summary.revenue / summary.orderCount) : App.formatCurrency(0);
         if (tax) tax.textContent = App.formatCurrency(summary.taxTotal);
 

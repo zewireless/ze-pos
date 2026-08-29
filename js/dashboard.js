@@ -10,7 +10,9 @@ const Dashboard = (() => {
 
         // Calculate stats
         const orders = DB.getAll('orders');
-        const todayOrders = orders.filter(o => o.createdAt && o.createdAt.startsWith(today));
+        // Voided orders stay visible in history but never count toward revenue.
+        const revenueOrders = orders.filter(o => o.status !== 'Voided');
+        const todayOrders = revenueOrders.filter(o => o.createdAt && o.createdAt.startsWith(today));
         const todayRevenue = todayOrders.reduce((sum, o) => sum + (parseFloat(o.total) || 0), 0);
         const totalProducts = DB.count('menu_items');
         const totalCategories = DB.count('categories');
@@ -78,7 +80,7 @@ const Dashboard = (() => {
             </div>
         `;
 
-        renderChart(orders);
+        renderChart(revenueOrders);
     }
 
     function renderRecentOrders(orders) {
@@ -104,7 +106,7 @@ const Dashboard = (() => {
                                 <td><strong>#${o.orderNumber}</strong></td>
                                 <td><span class="badge badge-info">${App.escapeHtml(o.type)}</span></td>
                                 <td><strong>${App.formatCurrency(o.total)}</strong></td>
-                                <td><span class="badge badge-success">${App.escapeHtml(o.status)}</span></td>
+                                <td><span class="badge ${o.status === 'Voided' ? 'badge-danger' : 'badge-success'}">${App.escapeHtml(o.status)}</span></td>
                                 <td class="text-muted">${App.formatDateTime(o.createdAt)}</td>
                             </tr>
                         `).join('')}

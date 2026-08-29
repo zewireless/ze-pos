@@ -109,6 +109,7 @@ const MultiStoreReports = (() => {
         }
 
         return DB.getAll('orders').filter(o => {
+            if (o.status === 'Voided') return false;
             if (!filterDateFrom || !filterDateTo) return true;
             const orderDate = o.createdAt.split('T')[0];
             return orderDate >= filterDateFrom && orderDate <= filterDateTo;

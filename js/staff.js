@@ -168,6 +168,14 @@ const Staff = (() => {
                     </select>
                 </div>
 
+                <div class="form-group" id="staffPinSection" style="display:none;">
+                    <label>Manager PIN</label>
+                    <input type="text" class="form-control" id="staffManagerPin" inputmode="numeric" maxlength="6"
+                           value="${user && user.managerPin ? App.escapeHtml(user.managerPin) : ''}"
+                           placeholder="4–6 digits">
+                    <small class="form-hint">Cashiers enter this PIN to authorize voiding a completed order. Leave blank to disable void authorization for this admin.</small>
+                </div>
+
                 <div class="form-group" id="staffPaySection" style="display:none;">
                     <label>Pay Type</label>
                     <select class="form-control" id="staffPayType">
@@ -196,13 +204,16 @@ const Staff = (() => {
             </div>
         `);
 
-        // Show pay fields only for cashiers; toggle hourly vs fixed
+        // Show pay fields only for cashiers; toggle hourly vs fixed.
+        // Show the Manager PIN field only for admins (used to authorize
+        // cashier-initiated order voids).
         const updatePayVisibility = () => {
             const isCashier = document.getElementById('staffRole').value === 'cashier';
             const isFixed = document.getElementById('staffPayType').value === 'fixed';
             document.getElementById('staffPaySection').style.display = isCashier ? '' : 'none';
             document.getElementById('staffHourlyWrap').style.display = isCashier && !isFixed ? '' : 'none';
             document.getElementById('staffFixedWrap').style.display = isCashier && isFixed ? '' : 'none';
+            document.getElementById('staffPinSection').style.display = isCashier ? 'none' : '';
         };
         document.getElementById('staffRole').addEventListener('change', updatePayVisibility);
         document.getElementById('staffPayType').addEventListener('change', updatePayVisibility);
@@ -240,8 +251,18 @@ const Staff = (() => {
                 fixedSalary = Math.max(0, parseFloat(document.getElementById('staffFixedSalary').value) || 0);
             }
 
+            // Manager PIN (admins only) — used to authorize cashier voids
+            let managerPin = '';
+            if (role === 'admin') {
+                managerPin = document.getElementById('staffManagerPin').value.trim();
+                if (managerPin && !/^\d{4,6}$/.test(managerPin)) {
+                    App.toast('Manager PIN must be 4–6 digits', 'error');
+                    return;
+                }
+            }
+
             if (isEdit) {
-                DB.update('users', id, { name, role, payType, hourlyRate, fixedSalary });
+                DB.update('users', id, { name, role, payType, hourlyRate, fixedSalary, managerPin });
                 DB.logAction('staff_update', 'users', id, { name, role, payType, hourlyRate, fixedSalary });
                 App.toast('Staff updated successfully');
             } else {
@@ -253,6 +274,7 @@ const Staff = (() => {
                     payType,
                     hourlyRate,
                     fixedSalary,
+                    managerPin,
                 });
                 // Auto-assign new staff to current store
                 try {

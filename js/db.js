@@ -38,7 +38,7 @@ const DB = (() => {
 
     // camelCase (app) → snake_case (column). Keys absent here pass through unchanged.
     const FIELD_MAP = {
-        users: { authUid: 'auth_uid', payType: 'pay_type', hourlyRate: 'hourly_rate', fixedSalary: 'fixed_salary', createdAt: 'created_at', storeId: 'store_id' },
+        users: { authUid: 'auth_uid', payType: 'pay_type', hourlyRate: 'hourly_rate', fixedSalary: 'fixed_salary', managerPin: 'manager_pin', createdAt: 'created_at', storeId: 'store_id' },
         categories: { createdAt: 'created_at', storeId: 'store_id' },
         menu_items: { categoryId: 'category_id', createdAt: 'created_at', storeId: 'store_id' },
         menu_sizes: { menuItemId: 'menu_item_id', createdAt: 'created_at', storeId: 'store_id' },
@@ -47,6 +47,7 @@ const DB = (() => {
         orders: {
             orderNumber: 'order_number', taxName: 'tax_name', taxPercentage: 'tax_percentage',
             taxAmount: 'tax_amount', userId: 'user_id', userName: 'user_name',
+            voidedAt: 'voided_at', voidedBy: 'voided_by', voidAuthorizedBy: 'void_authorized_by', voidReason: 'void_reason',
             shiftId: 'shift_id', createdAt: 'created_at', storeId: 'store_id'
         },
         order_items: { orderId: 'order_id', menuItemId: 'menu_item_id', unitPrice: 'unit_price', lineTotal: 'line_total', storeId: 'store_id' },
