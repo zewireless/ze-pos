@@ -34,12 +34,12 @@ const Supabase = (() => {
         return { profile: data || null, error };
     }
 
-    async function signUp({ email, password, businessName }) {
+    async function signUp({ email, password, businessName, joining }) {
         if (!client) return { error: new Error('Supabase not initialized') };
         const { data, error } = await client.auth.signUp({
             email,
             password,
-            options: { data: { business_name: businessName } },
+            options: { data: { business_name: businessName, joining: !!joining } },
         });
         return { user: data.user || null, error };
     }

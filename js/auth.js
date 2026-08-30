@@ -222,6 +222,33 @@ const Auth = (() => {
     async function login(email, password) {
         const { session, error } = await Supabase.signIn(email, password);
         if (error || !session) return { user: null, error };
+
+        // Check pending_join BEFORE DB.init() ever runs — DB.init() calls
+        // seed_workspace(), which auto-provisions a brand-new workspace
+        // (with this account as its admin/owner) for anyone not yet
+        // linked to one. An account still awaiting an invite must finish
+        // joining first, or it gets stuck owning its own empty workspace
+        // instead of ever reaching the one it was invited to.
+        const { profile: preProfile } = await Supabase.getProfile();
+        if (preProfile && preProfile.pending_join) {
+            return { user: null, error: null, needsInvite: true };
+        }
+
+        return finishLogin(session);
+    }
+
+    // Call after join_workspace(code) succeeds for an account that was
+    // waiting on an invite (see login()'s needsInvite result above).
+    async function completeJoin(code) {
+        const client = Supabase.getClient();
+        const { error: joinErr } = await client.rpc('join_workspace', { p_code: code });
+        if (joinErr) return { user: null, error: joinErr };
+        const { session } = await Supabase.getSession();
+        if (!session) return { user: null, error: new Error('Session expired — please sign in again.') };
+        return finishLogin(session);
+    }
+
+    async function finishLogin(session) {
         try {
             await DB.init();
         } catch (err) {
@@ -297,6 +324,7 @@ const Auth = (() => {
 
     return {
         login,
+        completeJoin,
         logout,
         currentUser,
         isLoggedIn,
