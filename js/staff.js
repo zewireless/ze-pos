@@ -184,7 +184,7 @@ const Staff = (() => {
                     </select>
                 </div>
                 <div class="form-group" id="staffHourlyWrap" style="display:none;">
-                    <label>Hourly Rate ($) <span class="required">*</span></label>
+                    <label>Hourly Rate (₱) <span class="required">*</span></label>
                     <input type="number" class="form-control" id="staffHourlyRate" step="0.01" min="0"
                            value="${user ? (user.hourlyRate ?? 0) : ''}"
                            placeholder="e.g. 12.50">
