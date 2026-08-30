@@ -591,7 +591,7 @@ const POS = (() => {
                     </div>
                 ` : ''}
                 <div class="form-group">
-                    <label>Starting Cash Float ($)</label>
+                    <label>Starting Cash Float (${App.currencySymbol()})</label>
                     <input type="number" class="form-control" id="startingCashInput" step="0.01" min="0"
                            placeholder="Enter the starting cash amount (optional)" value="0">
                     <small class="form-hint">The amount of cash in the drawer at the start of your shift.</small>
@@ -667,7 +667,7 @@ const POS = (() => {
                     <input type="text" class="form-control" value="${App.formatCurrency(openShift.startingCash || 0)}" readonly style="background:#f1f5f9;cursor:not-allowed;">
                 </div>
                 <div class="form-group">
-                    <label>Counted Cash ($)</label>
+                    <label>Counted Cash (${App.currencySymbol()})</label>
                     <input type="number" class="form-control" id="posEndingCashInput" step="0.01" min="0"
                            placeholder="Enter the counted cash amount">
                     <small class="form-hint">Optional — skip if you don't want to reconcile cash.</small>

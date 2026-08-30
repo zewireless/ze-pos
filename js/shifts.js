@@ -375,7 +375,7 @@ const Shifts = (() => {
                 ${Auth.isAdmin() ? `
                     <hr style="margin:20px 0;border-color:var(--border);">
                     <div class="form-group">
-                        <label>Pay Rate Override ($/hr) <span class="text-muted">(optional)</span></label>
+                        <label>Pay Rate Override (${App.currencySymbol()}/hr) <span class="text-muted">(optional)</span></label>
                         <input type="number" class="form-control" id="shiftPayRate" step="0.01" min="0"
                                value="${shift.payRate != null ? App.escapeHtml(shift.payRate) : ''}"
                                placeholder="Leave blank to use the cashier's hourly rate">
@@ -449,7 +449,7 @@ const Shifts = (() => {
                     <input type="text" class="form-control" value="${App.formatCurrency(shift.startingCash || 0)}" readonly style="background:#f1f5f9;cursor:not-allowed;">
                 </div>
                 <div class="form-group">
-                    <label>Counted Cash ($)</label>
+                    <label>Counted Cash (${App.currencySymbol()})</label>
                     <input type="number" class="form-control" id="endingCashInput" step="0.01" min="0"
                            placeholder="Enter the counted cash amount">
                     <small class="form-hint">Optional — skip if you don't want to reconcile cash.</small>

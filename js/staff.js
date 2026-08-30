@@ -184,14 +184,14 @@ const Staff = (() => {
                     </select>
                 </div>
                 <div class="form-group" id="staffHourlyWrap" style="display:none;">
-                    <label>Hourly Rate (₱) <span class="required">*</span></label>
+                    <label>Hourly Rate (${App.currencySymbol()}) <span class="required">*</span></label>
                     <input type="number" class="form-control" id="staffHourlyRate" step="0.01" min="0"
                            value="${user ? (user.hourlyRate ?? 0) : ''}"
                            placeholder="e.g. 12.50">
                     <small class="form-hint">Paid per hour worked. Payroll = hours × rate.</small>
                 </div>
                 <div class="form-group" id="staffFixedWrap" style="display:none;">
-                    <label>Fixed Salary ($ / week) <span class="required">*</span></label>
+                    <label>Fixed Salary (${App.currencySymbol()} / week) <span class="required">*</span></label>
                     <input type="number" class="form-control" id="staffFixedSalary" step="0.01" min="0"
                            value="${user ? (user.fixedSalary ?? 0) : ''}"
                            placeholder="e.g. 480">

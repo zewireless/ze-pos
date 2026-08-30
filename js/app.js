@@ -8,8 +8,12 @@ const App = (() => {
     function $(sel, ctx) { return (ctx || document).querySelector(sel); }
     function $$(sel, ctx) { return [...(ctx || document).querySelectorAll(sel)]; }
 
+    function currencySymbol() {
+        return DB.getSetting('currency_symbol') || '$';
+    }
+
     function formatCurrency(amount) {
-        const symbol = DB.getSetting('currency_symbol') || '$';
+        const symbol = currencySymbol();
         return symbol + parseFloat(amount || 0).toFixed(2);
     }
 
@@ -371,7 +375,22 @@ const App = (() => {
                             </div>
                             <div class="form-group">
                                 <label>Currency Symbol</label>
-                                <input type="text" class="form-control" id="settCurrency" value="${escapeHtml(currency)}" style="width:80px">
+                                <select class="form-control" id="settCurrency" style="width:200px">
+                                    <option value="₱" ${currency === '₱' ? 'selected' : ''}>₱ — Philippine Peso</option>
+                                    <option value="$" ${currency === '$' ? 'selected' : ''}>$ — US Dollar</option>
+                                    <option value="€" ${currency === '€' ? 'selected' : ''}>€ — Euro</option>
+                                    <option value="£" ${currency === '£' ? 'selected' : ''}>£ — British Pound</option>
+                                    <option value="A$" ${currency === 'A$' ? 'selected' : ''}>A$ — Australian Dollar</option>
+                                    <option value="C$" ${currency === 'C$' ? 'selected' : ''}>C$ — Canadian Dollar</option>
+                                    <option value="RM" ${currency === 'RM' ? 'selected' : ''}>RM — Malaysian Ringgit</option>
+                                    <option value="S$" ${currency === 'S$' ? 'selected' : ''}>S$ — Singapore Dollar</option>
+                                    <option value="Rp" ${currency === 'Rp' ? 'selected' : ''}>Rp — Indonesian Rupiah</option>
+                                    <option value="₹" ${currency === '₹' ? 'selected' : ''}>₹ — Indian Rupee</option>
+                                    <option value="custom" ${!['₱','$','€','£','A$','C$','RM','S$','Rp','₹'].includes(currency) ? 'selected' : ''}>Custom…</option>
+                                </select>
+                                <input type="text" class="form-control" id="settCurrencyCustom"
+                                       value="${escapeHtml(currency)}" placeholder="e.g. ₦, kr, zł"
+                                       style="width:100px;margin-top:8px;${['₱','$','€','£','A$','C$','RM','S$','Rp','₹'].includes(currency) ? 'display:none;' : ''}">
                             </div>
                             <button class="btn btn-primary" id="btnSaveSettings">Save Settings</button>
                         </div>
@@ -422,16 +441,24 @@ const App = (() => {
             ` : ''}
         `;
 
+        const currencySelect = $('#settCurrency');
+        const currencyCustom = $('#settCurrencyCustom');
+        const resolveCurrency = () => currencySelect.value === 'custom' ? (currencyCustom.value.trim() || '$') : currencySelect.value;
+        currencySelect.addEventListener('change', () => {
+            currencyCustom.style.display = currencySelect.value === 'custom' ? '' : 'none';
+        });
+
         $('#btnSaveSettings').addEventListener('click', () => {
+            const resolvedCurrency = resolveCurrency();
             DB.setSetting('restaurant_name', $('#settName').value.trim());
             DB.setSetting('restaurant_address', $('#settAddress').value.trim());
             DB.setSetting('restaurant_phone', $('#settPhone').value.trim());
-            DB.setSetting('currency_symbol', $('#settCurrency').value.trim() || '$');
+            DB.setSetting('currency_symbol', resolvedCurrency);
             DB.logAction('settings_update', 'settings', null, {
                 restaurant_name: $('#settName').value.trim(),
                 restaurant_address: $('#settAddress').value.trim(),
                 restaurant_phone: $('#settPhone').value.trim(),
-                currency_symbol: $('#settCurrency').value.trim() || '$',
+                currency_symbol: resolvedCurrency,
             });
             toast('Settings saved successfully');
         });
@@ -796,6 +823,7 @@ const App = (() => {
         confirm,
         toast,
         formatCurrency,
+        currencySymbol,
         formatDate,
         formatDateTime,
         escapeHtml,
