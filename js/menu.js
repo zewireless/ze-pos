@@ -7,6 +7,7 @@ const Menu = (() => {
 
     function render() {
         const el = document.getElementById('page-menu');
+        if (!el) return; // not the active panel — nothing to redraw here
         const items = DB.getAll('menu_items');
         const categories = DB.getAll('categories');
 
@@ -309,9 +310,9 @@ const Menu = (() => {
         }
     }
 
-    async function deleteItem(id) {
+    async function deleteItem(id, opts = {}) {
         const item = DB.getById('menu_items', id);
-        const yes = await App.confirm('Delete Menu Item?', 'This will permanently remove this item and its sizes.');
+        const yes = opts.skipConfirm || await App.confirm('Delete Menu Item?', 'This will permanently remove this item and its sizes.');
         if (yes) {
             DB.remove('menu_items', id);
             // Remove associated sizes
@@ -322,5 +323,5 @@ const Menu = (() => {
         }
     }
 
-    return { render };
+    return { render, deleteItem };
 })();

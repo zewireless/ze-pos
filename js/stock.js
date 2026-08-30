@@ -247,6 +247,7 @@ const Stock = (() => {
                         ${item.hasSizeStock ? `
                             <button class="btn btn-ghost btn-sm" data-action="view-sizes" data-id="${item.id}" title="Size-level stock">📏</button>
                         ` : ''}
+                        <button class="btn btn-ghost btn-sm" data-action="delete-item" data-id="${item.id}" title="Delete item entirely (removes from menu/POS too)" style="color:var(--danger);">🗑</button>
                     </div>
                 </td>
             </tr>
@@ -400,6 +401,34 @@ const Stock = (() => {
         document.querySelectorAll('[data-action="view-sizes"]').forEach(btn => {
             btn.addEventListener('click', () => openSizeStockModal(btn.dataset.id));
         });
+
+        // Delete item entirely (menu item + its sizes + its stock movement history)
+        document.querySelectorAll('[data-action="delete-item"]').forEach(btn => {
+            btn.addEventListener('click', () => deleteStockItem(btn.dataset.id));
+        });
+    }
+
+    async function deleteStockItem(id) {
+        const item = DB.getById('menu_items', id);
+        if (!item) return;
+        const yes = await App.confirm(
+            'Delete Item?',
+            `This permanently removes "${item.name}" from your menu and POS, along with all of its stock movement history. This can't be undone.`
+        );
+        if (!yes) return;
+
+        // Reuse the canonical delete (removes the menu item + its sizes,
+        // and logs the action) so this never drifts out of sync with the
+        // Menu Items page's own delete behavior.
+        await Menu.deleteItem(id, { skipConfirm: true });
+
+        // Also clear out its movement history — deleting an item here is
+        // meant to let a client start completely fresh on that item, not
+        // leave orphaned movement rows still referencing it.
+        DB.query('stock_movements', m => m.menuItemId === id).forEach(m => DB.remove('stock_movements', m.id));
+
+        App.toast(`${item.name} deleted`);
+        render();
     }
 
     function bindMovementsEvents() {
