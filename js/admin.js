@@ -472,6 +472,9 @@ const Admin = (() => {
                                         ${c.subscription_status === 'active'
                                             ? `<button class="btn btn-outline btn-sm" data-action="cancel" data-id="${c.id}" data-name="${App_escapeHtml(c.business_name)}">Cancel</button>`
                                             : `<button class="btn btn-outline btn-sm" data-action="overdue" data-id="${c.id}" data-name="${App_escapeHtml(c.business_name)}">Mark Overdue</button>`}
+                                        ${(!c.is_super_admin && c.subscription_status !== 'active' && c.id !== selfId)
+                                            ? `<button class="btn btn-danger btn-sm" data-action="delete" data-id="${c.id}" data-name="${App_escapeHtml(c.business_name)}" data-email="${App_escapeHtml(c.email || '')}" title="Permanently delete this client">🗑 Delete</button>`
+                                            : ''}
                                     </div>
                                 </td>
                             </tr>
@@ -490,6 +493,7 @@ const Admin = (() => {
                 else if (action === 'overdue') setStatus(id, 'overdue', `Mark ${name} as overdue?`);
                 else if (action === 'promote') setOperator(id, true, `Make ${name} (${email}) a platform operator?`);
                 else if (action === 'demote') setOperator(id, false, `Demote ${name} (${email}) to a normal client?`);
+                else if (action === 'delete') deleteClientConfirm(id, name, email);
             });
         });
     }
@@ -634,6 +638,52 @@ const Admin = (() => {
                 closeModal();
                 load();
             });
+        });
+    }
+
+    async function deleteClientConfirm(id, businessName, email) {
+        openModal(`
+            <div class="modal-header">
+                <h3>🗑 Permanently Delete Client</h3>
+                <button class="modal-close" onclick="Admin.closeModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="color:var(--danger);font-weight:600;margin-bottom:12px;">
+                    This cannot be undone. All of ${App_escapeHtml(businessName)}'s data — menu, orders, staff, reports, everything — will be permanently erased.
+                </p>
+                <p class="text-muted" style="margin-bottom:16px;">
+                    Their email (${App_escapeHtml(email)}) will be freed up, so they can register again from scratch later if they come back.
+                </p>
+                <div class="form-group">
+                    <label>Type the business name to confirm: <strong>${App_escapeHtml(businessName)}</strong></label>
+                    <input type="text" class="form-control" id="deleteConfirmInput" autocomplete="off">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="Admin.closeModal()">Cancel</button>
+                <button class="btn btn-danger" id="btnConfirmDeleteClient" disabled>Delete Permanently</button>
+            </div>
+        `);
+
+        const input = document.getElementById('deleteConfirmInput');
+        const btn = document.getElementById('btnConfirmDeleteClient');
+        input.addEventListener('input', () => {
+            btn.disabled = input.value.trim() !== businessName;
+        });
+        btn.addEventListener('click', async () => {
+            btn.disabled = true;
+            btn.textContent = 'Deleting…';
+            const client = Supabase.getClient();
+            const { error } = await client.rpc('admin_delete_client', { p_client_id: id });
+            if (error) {
+                toast(error.message || 'Could not delete client', 'error');
+                btn.disabled = false;
+                btn.textContent = 'Delete Permanently';
+                return;
+            }
+            closeModal();
+            toast(`${businessName} deleted`);
+            load();
         });
     }
 
