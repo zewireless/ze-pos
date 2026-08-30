@@ -41,6 +41,17 @@
                 <button type="submit" class="btn-login" id="loginBtn">Sign In</button>
             </form>
 
+            <form class="login-form" id="joinFinishForm" style="display:none;">
+                <p class="login-subtitle" style="margin-bottom:16px;">
+                    Almost there — enter the invite code your manager gave you to finish joining their workspace.
+                </p>
+                <div class="form-group">
+                    <label for="joinFinishCode">Invite Code</label>
+                    <input type="text" id="joinFinishCode" placeholder="e.g. A1B2C3D4E5" required autocomplete="off" style="text-transform:uppercase;">
+                </div>
+                <button type="submit" class="btn-login" id="joinFinishBtn">Finish Joining</button>
+            </form>
+
             <div class="login-hint">
                 New to ZE-POS? <a href="register.html"><strong>Create an account</strong></a><br>
                 <span class="text-muted">Monthly subscription · GCash / Maya / bank accepted</span><br>
@@ -68,16 +79,27 @@
                 return;
             }
 
-            // Already signed in? Go straight to the app.
+            // Already signed in? Go straight to the app — unless this
+            // account is still waiting to join a workspace (see the
+            // needsInvite handling below), in which case DB.init() must
+            // not run yet (it auto-provisions a brand-new workspace for
+            // anyone not yet linked to one).
             const session = await Supabase.getSession();
             if (session) {
                 const { profile } = await Supabase.getProfile();
-                if (profile) {
+                if (profile && profile.pending_join) {
+                    showJoinFinishForm();
+                } else if (profile) {
                     await DB.init();
                     await Auth.setSession(profile);
                     window.location.href = Auth.isSuperAdmin() ? 'admin.html' : 'app.html';
                     return;
                 }
+            }
+
+            function showJoinFinishForm() {
+                document.getElementById('loginForm').style.display = 'none';
+                document.getElementById('joinFinishForm').style.display = '';
             }
 
             function showResetForm() {
@@ -160,9 +182,15 @@
 
                 btn.disabled = true;
                 btn.textContent = 'Signing in…';
-                const { user, error } = await Auth.login(email, password);
+                const { user, error, needsInvite } = await Auth.login(email, password);
                 btn.disabled = false;
                 btn.textContent = 'Sign In';
+
+                if (needsInvite) {
+                    countdownEl.style.display = 'none';
+                    showJoinFinishForm();
+                    return;
+                }
 
                 if (error || !user) {
                     const rec = await Lockout.record('login', email);
@@ -176,19 +204,33 @@
                     return;
                 }
 
-                // Success — clear lockout on both sides
+                // Success — clear lockout on both sides. Auth.login() already
+                // ran DB.init() and setSession() internally.
                 await Lockout.reset('login', email);
                 countdownEl.style.display = 'none';
+                window.location.href = Auth.isSuperAdmin() ? 'admin.html' : 'app.html';
+            });
 
-                try {
-                    await DB.init();
-                    const { profile } = await Supabase.getProfile();
-                    await Auth.setSession(profile);
-                    window.location.href = Auth.isSuperAdmin() ? 'admin.html' : 'app.html';
-                } catch (err) {
-                    errorEl.textContent = 'Could not load your workspace: ' + (err.message || err);
+            // Finish a pending join (see needsInvite handling above)
+            document.getElementById('joinFinishForm').addEventListener('submit', async function (e) {
+                e.preventDefault();
+                const code = document.getElementById('joinFinishCode').value.trim().toUpperCase();
+                const finishBtn = document.getElementById('joinFinishBtn');
+                errorEl.style.display = 'none';
+                finishBtn.disabled = true;
+                finishBtn.textContent = 'Joining…';
+
+                const { user, error } = await Auth.completeJoin(code);
+                finishBtn.disabled = false;
+                finishBtn.textContent = 'Finish Joining';
+
+                if (error || !user) {
+                    errorEl.textContent = error && error.message ? error.message : 'Could not join the workspace.';
                     errorEl.style.display = 'block';
+                    return;
                 }
+                // Auth.completeJoin() already ran DB.init() and setSession() internally.
+                window.location.href = Auth.isSuperAdmin() ? 'admin.html' : 'app.html';
             });
         })();
     </script>

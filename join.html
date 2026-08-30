@@ -111,7 +111,7 @@
                 btn.disabled = true;
                 btn.textContent = 'Creating account…';
 
-                const { user, error } = await Supabase.signUp({ email, password });
+                const { user, error } = await Supabase.signUp({ email, password, joining: true });
                 if (error) {
                     const rec = await Lockout.record('join', email);
                     if (rec.locked) {
