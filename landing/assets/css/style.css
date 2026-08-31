@@ -517,7 +517,14 @@ ul { list-style: none; }
 
 .app-sidebar-demo .sidebar-brand-icon {
   font-size: 1.4rem;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+.app-sidebar-demo .sidebar-brand-icon img { width: 100%; height: 100%; object-fit: contain; }
 
 .app-sidebar-demo .sidebar-brand-text {
   font-family: var(--display);
@@ -776,6 +783,9 @@ ul { list-style: none; }
   display: grid; place-items: center; text-align: center; padding: 40px; gap: 8px;
 }
 .form-success.hidden { display: none; }
+.ci-copied { color: #4ade80; font-size: 0.82rem; font-weight: 600; }
+.ci-copied.hidden { display: none; }
+.ci-copy-link { cursor: pointer; }
 .success-icon {
   width: 64px; height: 64px; border-radius: 50%; background: rgba(16,185,129,.15);
   color: var(--success); display: grid; place-items: center; font-size: 1.8rem; font-weight: 800; margin-bottom: 8px;
