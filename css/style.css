@@ -91,6 +91,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
     font-size: 32px;
     color: white;
 }
+.login-logo img { width: 65%; height: 65%; object-fit: contain; }
 .login-title {
     font-size: 1.75rem;
     font-weight: 700;
@@ -211,6 +212,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
     font-size: 20px;
     flex-shrink: 0;
 }
+.sidebar-brand-icon img { width: 70%; height: 70%; object-fit: contain; }
 .sidebar-brand-text {
     font-weight: 700;
     font-size: 1.1rem;
