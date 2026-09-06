@@ -30,7 +30,7 @@ const DB = (() => {
     // bare '*' against `users` always 403s (42501) even though the column
     // grant covers everything the app actually needs. Every hydration of the
     // `users` table must use this explicit list instead of '*'.
-    const USERS_SAFE_COLUMNS = 'workspace_id,store_id,id,username,name,role,enabled,pay_type,hourly_rate,fixed_salary,manager_pin,created_at,auth_uid';
+    const USERS_SAFE_COLUMNS = 'workspace_id,store_id,id,username,name,role,enabled,pay_type,hourly_rate,fixed_salary,created_at,auth_uid';
 
     function selectColsFor(table) {
         return table === 'users' ? USERS_SAFE_COLUMNS : '*';
@@ -38,7 +38,7 @@ const DB = (() => {
 
     // camelCase (app) → snake_case (column). Keys absent here pass through unchanged.
     const FIELD_MAP = {
-        users: { authUid: 'auth_uid', payType: 'pay_type', hourlyRate: 'hourly_rate', fixedSalary: 'fixed_salary', managerPin: 'manager_pin', createdAt: 'created_at', storeId: 'store_id' },
+        users: { authUid: 'auth_uid', payType: 'pay_type', hourlyRate: 'hourly_rate', fixedSalary: 'fixed_salary', createdAt: 'created_at', storeId: 'store_id' },
         categories: { createdAt: 'created_at', storeId: 'store_id' },
         menu_items: { categoryId: 'category_id', createdAt: 'created_at', storeId: 'store_id' },
         menu_sizes: { menuItemId: 'menu_item_id', createdAt: 'created_at', storeId: 'store_id' },
@@ -47,7 +47,6 @@ const DB = (() => {
         orders: {
             orderNumber: 'order_number', taxName: 'tax_name', taxPercentage: 'tax_percentage',
             taxAmount: 'tax_amount', userId: 'user_id', userName: 'user_name',
-            voidedAt: 'voided_at', voidedBy: 'voided_by', voidAuthorizedBy: 'void_authorized_by', voidReason: 'void_reason',
             shiftId: 'shift_id', createdAt: 'created_at', storeId: 'store_id'
         },
         order_items: { orderId: 'order_id', menuItemId: 'menu_item_id', unitPrice: 'unit_price', lineTotal: 'line_total', storeId: 'store_id' },
@@ -195,7 +194,6 @@ const DB = (() => {
 
     function clear(table) {
         cache[table] = (cache[table] || []).filter(r => r.storeId !== currentStoreId);
-        enqueueWrite('clear', table, null);
     }
 
     function resetAll() {
@@ -359,14 +357,7 @@ const DB = (() => {
         const seedErr = await Supabase.seedWorkspace();
         if (seedErr) console.warn('seed_workspace:', seedErr.message || seedErr);
 
-        // 7. Flush any writes left over from a previous session BEFORE
-        // pulling fresh data — otherwise a write that was still in-flight
-        // when the page was refreshed/closed gets silently wiped out by
-        // step 8's hydration, which always reflects whatever's on the
-        // server at that moment (i.e. not-yet-synced local changes).
-        await processOutbox();
-
-        // 8. Hydrate cache for current store only (other stores loaded on demand)
+        // 7. Hydrate cache for current store only (other stores loaded on demand)
         await Promise.all(TABLES.map(async (table) => {
             const { data, error } = await client
                 .from(table)
@@ -377,6 +368,7 @@ const DB = (() => {
             cache[table] = (data || []).map(r => fromDb(table, r));
         }));
 
+        processOutbox();
         return true;
     }
 
@@ -483,6 +475,163 @@ async function refreshAssignedStores() {
         if (error) throw error;
     }
 
+    // Clone a just-created/edited row (menu item, category, condiment,
+    // size...) into every OTHER enabled store in the workspace, reusing
+    // the same `id` so it's recognizable as "the same" thing across
+    // stores (the composite PK is workspace_id+store_id+id since
+    // 005_multi_store.sql, so the same id CAN exist once per store).
+    //
+    // Each store's copy is fully independent afterward — DB.update()/
+    // DB.remove() only ever touch the current store's row (unchanged
+    // behavior), so a cashier can freely edit price or delete an item
+    // in one store without affecting any other store.
+    //
+    // Uses ignoreDuplicates so re-running this (e.g. clicking "Copy to
+    // Other Stores" again later) never clobbers a store's own edit to
+    // an item it already has a copy of.
+    //
+    // No-op for single-store workspaces — loadAllWorkspaceStores()
+    // returns just the one store, which gets filtered out as the
+    // source, leaving nothing to propagate to.
+    async function propagateToStores(table, row) {
+        try {
+            const targets = await otherWritableStores();
+            if (!targets.length) return;
+
+            const client = Supabase.getClient();
+            const baseDbRow = toDb(table, row); // camelCase -> snake_case, stamps workspace_id
+
+            // One upsert per target store rather than a single batched
+            // multi-row upsert: RLS violations abort the whole statement,
+            // not just the offending row, so batching would mean one
+            // unreachable store silently blocks every other store's copy
+            // too. Per-store calls let the rest still succeed.
+            const failures = [];
+            for (const s of targets) {
+                const { error } = await client
+                    .from(table)
+                    .upsert({ ...baseDbRow, store_id: s.id }, { onConflict: 'workspace_id,store_id,id', ignoreDuplicates: true });
+                if (error) {
+                    failures.push(s.name || s.id);
+                    console.warn('propagateToStores:', table, s.id, error.message || error);
+                    continue;
+                }
+                // Warm the local cache too, so switching to that store shows
+                // the copy immediately instead of waiting on a refetch.
+                cache[table] = cache[table] || [];
+                const exists = cache[table].some(r => r.id === row.id && r.storeId === s.id);
+                if (!exists) cache[table].push({ ...row, storeId: s.id });
+            }
+            if (failures.length) {
+                App?.toast?.(`Couldn't copy to: ${failures.join(', ')}`, 'error');
+            }
+        } catch (err) {
+            console.warn('propagateToStores:', table, err.message || err);
+            App?.toast?.(`Couldn't copy to other stores: ${err.message || err}`, 'error');
+        }
+    }
+
+    // Shared by propagateToStores/syncEditToStores/replaceMenuSizesInStores:
+    // every other enabled workspace store this user is actually allowed
+    // to write into (see the RLS note above).
+    async function otherWritableStores() {
+        const stores = await loadAllWorkspaceStores();
+        const assigned = new Set(getAssignedStores());
+        return stores.filter(s => s.id !== currentStoreId && assigned.has(s.id));
+    }
+
+    // Overwrite version of propagateToStores — used for EDITS that should
+    // replace the same id's row in every other store (e.g. a price
+    // change the store owner wants everywhere), as opposed to
+    // propagateToStores's "fill in only if missing" behavior for new
+    // items. Unlike propagateToStores, this WILL clobber whatever that
+    // other store's row currently has — that's the point, but it does
+    // mean any price a store had deliberately set differently gets
+    // overwritten too. Callers should let the person opt out per-edit
+    // (see the "Apply to all stores" checkbox in menu.js/categories.js/
+    // condiments.js) rather than always calling this unconditionally.
+    async function syncEditToStores(table, row) {
+        try {
+            const targets = await otherWritableStores();
+            if (!targets.length) return;
+
+            const client = Supabase.getClient();
+            const baseDbRow = toDb(table, row);
+            const failures = [];
+            for (const s of targets) {
+                const { error } = await client
+                    .from(table)
+                    .upsert({ ...baseDbRow, store_id: s.id }, { onConflict: 'workspace_id,store_id,id' }); // no ignoreDuplicates — overwrite on purpose
+                if (error) {
+                    failures.push(s.name || s.id);
+                    console.warn('syncEditToStores:', table, s.id, error.message || error);
+                    continue;
+                }
+                cache[table] = cache[table] || [];
+                const idx = cache[table].findIndex(r => r.id === row.id && r.storeId === s.id);
+                if (idx >= 0) cache[table][idx] = { ...row, storeId: s.id };
+                else cache[table].push({ ...row, storeId: s.id });
+            }
+            if (failures.length) {
+                App?.toast?.(`Couldn't sync edit to: ${failures.join(', ')}`, 'error');
+            }
+        } catch (err) {
+            console.warn('syncEditToStores:', table, err.message || err);
+            App?.toast?.(`Couldn't sync edit to other stores: ${err.message || err}`, 'error');
+        }
+    }
+
+    // menu_sizes needs its own replace helper because editing an item's
+    // sizes in the CURRENT store already works by deleting every old
+    // size row and inserting fresh ones with brand-new ids (see
+    // menu.js) — there's no stable size id to upsert against in other
+    // stores. So this mirrors that same delete-then-insert replace,
+    // applied to every other writable store, using the exact new size
+    // rows (and ids) the current store just created.
+    async function replaceMenuSizesInStores(menuItemId, newSizeRows) {
+        try {
+            const targets = await otherWritableStores();
+            if (!targets.length) return;
+
+            const client = Supabase.getClient();
+            const dbSizeIdField = (FIELD_MAP.menu_sizes && FIELD_MAP.menu_sizes.menuItemId) || 'menu_item_id';
+            const failures = [];
+            for (const s of targets) {
+                const { error: delErr } = await client
+                    .from('menu_sizes')
+                    .delete()
+                    .eq('workspace_id', workspaceId)
+                    .eq('store_id', s.id)
+                    .eq(dbSizeIdField, menuItemId);
+                if (delErr) {
+                    failures.push(s.name || s.id);
+                    console.warn('replaceMenuSizesInStores delete:', s.id, delErr.message || delErr);
+                    continue;
+                }
+                cache.menu_sizes = (cache.menu_sizes || []).filter(r => !(r.storeId === s.id && r.menuItemId === menuItemId));
+
+                if (newSizeRows.length) {
+                    const rows = newSizeRows.map(sz => ({ ...toDb('menu_sizes', sz), store_id: s.id }));
+                    const { error: insErr } = await client
+                        .from('menu_sizes')
+                        .upsert(rows, { onConflict: 'workspace_id,store_id,id' });
+                    if (insErr) {
+                        failures.push(s.name || s.id);
+                        console.warn('replaceMenuSizesInStores insert:', s.id, insErr.message || insErr);
+                        continue;
+                    }
+                    newSizeRows.forEach(sz => cache.menu_sizes.push({ ...sz, storeId: s.id }));
+                }
+            }
+            if (failures.length) {
+                App?.toast?.(`Couldn't sync sizes to: ${failures.join(', ')}`, 'error');
+            }
+        } catch (err) {
+            console.warn('replaceMenuSizesInStores:', err.message || err);
+            App?.toast?.(`Couldn't sync sizes to other stores: ${err.message || err}`, 'error');
+        }
+    }
+
     async function unassignUserFromStore(userId, storeId) {
         const client = Supabase.getClient();
         const { error } = await client.from('user_stores')
@@ -508,12 +657,6 @@ async function refreshAssignedStores() {
     return {
         generateId,
         init,
-        // Lets a caller explicitly wait for pending background writes to
-        // actually reach Supabase — needed right before any server-side
-        // check (like an RPC) that depends on a just-inserted row already
-        // existing there (insert()/update() themselves stay synchronous
-        // and fire-and-forget, so most callers don't need this).
-        flushOutbox: processOutbox,
         getWorkspaceId,
         getCurrentStore,
         getAssignedStores,
@@ -525,6 +668,9 @@ async function refreshAssignedStores() {
         assignUserToStore,
         unassignUserFromStore,
         getUserStoreAssignments,
+        propagateToStores,
+        syncEditToStores,
+        replaceMenuSizesInStores,
 
         logAction,
 

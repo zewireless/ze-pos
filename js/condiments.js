@@ -101,6 +101,12 @@ const Condiments = (() => {
                     <label>Price <span class="required">*</span></label>
                     <input type="number" class="form-control" id="condPrice" value="${item ? item.price : '0.00'}" step="0.01" min="0" placeholder="0.00">
                 </div>
+                ${item && App.hasFeature('MultiStore') ? `
+                <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+                    <input type="checkbox" id="condApplyAllStores" checked style="width:auto;">
+                    <label for="condApplyAllStores" style="margin:0;">Apply to every other store too</label>
+                </div>
+                ` : ''}
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline" onclick="App.closeModal()">Cancel</button>
@@ -116,10 +122,17 @@ const Condiments = (() => {
 
             if (item) {
                 DB.update('condiments', id, { name, price });
+                const applyAll = document.getElementById('condApplyAllStores');
+                if (applyAll && applyAll.checked) {
+                    DB.syncEditToStores('condiments', DB.getById('condiments', id));
+                }
                 DB.logAction('condiment_update', 'condiments', id, { name, price });
-                App.toast('Condiment updated');
+                App.toast(applyAll && applyAll.checked ? 'Condiment updated everywhere' : 'Condiment updated (this store only)');
             } else {
                 const rec = DB.insert('condiments', { name, price, enabled: true });
+                // Auto-copy to every other store — same reasoning as menu
+                // items, so a new condiment doesn't need re-typing per store.
+                DB.propagateToStores('condiments', rec);
                 DB.logAction('condiment_add', 'condiments', rec.id, { name, price });
                 App.toast('Condiment added');
             }

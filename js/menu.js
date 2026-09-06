@@ -7,7 +7,6 @@ const Menu = (() => {
 
     function render() {
         const el = document.getElementById('page-menu');
-        if (!el) return; // not the active panel — nothing to redraw here
         const items = DB.getAll('menu_items');
         const categories = DB.getAll('categories');
 
@@ -175,8 +174,16 @@ const Menu = (() => {
                     <label>Notes (visible to kitchen)</label>
                     <input type="text" class="form-control" id="itemNotes" value="${item ? App.escapeHtml(item.notes || '') : ''}" placeholder="Optional notes">
                 </div>
+                ${item && App.hasFeature('MultiStore') ? `
+                <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+                    <input type="checkbox" id="itemApplyAllStores" checked style="width:auto;">
+                    <label for="itemApplyAllStores" style="margin:0;">Apply these changes to this item in every other store too</label>
+                </div>
+                <div class="text-muted" style="font-size:12px;margin-top:-6px;margin-bottom:10px;">Uncheck this if you want this store's price/name to stay different from the others.</div>
+                ` : ''}
             </div>
             <div class="modal-footer">
+                ${item && App.hasFeature('MultiStore') ? `<button class="btn btn-outline" id="btnCopyToStores" style="margin-right:auto;" title="Copy this item (and its category) to every other store">📋 Copy to Other Stores</button>` : ''}
                 <button class="btn btn-outline" onclick="App.closeModal()">Cancel</button>
                 <button class="btn btn-primary" id="btnSaveMenu">Save</button>
             </div>
@@ -201,6 +208,23 @@ const Menu = (() => {
         });
 
         bindSizeRemove();
+
+        // Retroactive copy — for items that existed before auto-copy-on-
+        // create was added, or that were only added to one store on
+        // purpose and are now needed elsewhere too.
+        document.getElementById('btnCopyToStores')?.addEventListener('click', async () => {
+            const btn = document.getElementById('btnCopyToStores');
+            btn.disabled = true;
+            btn.textContent = 'Copying…';
+            const cat = DB.getById('categories', item.categoryId);
+            if (cat) await DB.propagateToStores('categories', cat);
+            await DB.propagateToStores('menu_items', item);
+            const curSizes = DB.query('menu_sizes', s => s.menuItemId === item.id);
+            for (const s of curSizes) await DB.propagateToStores('menu_sizes', s);
+            App.toast(`"${item.name}" copied to other stores`);
+            btn.disabled = false;
+            btn.textContent = '📋 Copy to Other Stores';
+        });
 
         // Save
         document.getElementById('btnSaveMenu').addEventListener('click', () => {
@@ -237,12 +261,29 @@ const Menu = (() => {
                 // Replace sizes
                 const oldSizes = DB.query('menu_sizes', s => s.menuItemId === id);
                 oldSizes.forEach(s => DB.remove('menu_sizes', s.id));
-                sizeData.forEach(s => DB.insert('menu_sizes', { menuItemId: id, name: s.name, price: s.price }));
+                const newSizeRows = sizeData.map(s => DB.insert('menu_sizes', { menuItemId: id, name: s.name, price: s.price }));
                 DB.logAction('menu_item_update', 'menu_items', id, { name, categoryId, sizes: sizeData });
-                App.toast('Menu item updated');
+
+                const applyAll = document.getElementById('itemApplyAllStores');
+                if (applyAll && applyAll.checked) {
+                    const updatedItem = DB.getById('menu_items', id);
+                    DB.syncEditToStores('menu_items', updatedItem);
+                    DB.replaceMenuSizesInStores(id, newSizeRows);
+                }
+                App.toast(applyAll && applyAll.checked ? 'Menu item updated everywhere' : 'Menu item updated (this store only)');
             } else {
                 const newItem = DB.insert('menu_items', { ...imageData, enabled: true });
-                sizeData.forEach(s => DB.insert('menu_sizes', { menuItemId: newItem.id, name: s.name, price: s.price }));
+                // Auto-copy new items to every other store so staff don't
+                // have to re-encode the same item per store — each store's
+                // copy is independently editable/deletable afterward. Copy
+                // the category too, in case it's also brand new.
+                const cat = DB.getById('categories', categoryId);
+                if (cat) DB.propagateToStores('categories', cat);
+                DB.propagateToStores('menu_items', newItem);
+                sizeData.forEach(s => {
+                    const newSize = DB.insert('menu_sizes', { menuItemId: newItem.id, name: s.name, price: s.price });
+                    DB.propagateToStores('menu_sizes', newSize);
+                });
                 DB.logAction('menu_item_add', 'menu_items', newItem.id, { name, categoryId, sizes: sizeData });
                 App.toast('Menu item created');
             }
@@ -310,9 +351,9 @@ const Menu = (() => {
         }
     }
 
-    async function deleteItem(id, opts = {}) {
+    async function deleteItem(id) {
         const item = DB.getById('menu_items', id);
-        const yes = opts.skipConfirm || await App.confirm('Delete Menu Item?', 'This will permanently remove this item and its sizes.');
+        const yes = await App.confirm('Delete Menu Item?', 'This will permanently remove this item and its sizes.');
         if (yes) {
             DB.remove('menu_items', id);
             // Remove associated sizes
@@ -323,5 +364,5 @@ const Menu = (() => {
         }
     }
 
-    return { render, deleteItem };
+    return { render };
 })();

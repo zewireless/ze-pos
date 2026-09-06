@@ -109,6 +109,12 @@ const Categories = (() => {
                     <label>Description</label>
                     <input type="text" class="form-control" id="catDesc" value="${cat ? App.escapeHtml(cat.description || '') : ''}" placeholder="Short description">
                 </div>
+                ${cat && App.hasFeature('MultiStore') ? `
+                <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+                    <input type="checkbox" id="catApplyAllStores" checked style="width:auto;">
+                    <label for="catApplyAllStores" style="margin:0;">Apply to every other store too</label>
+                </div>
+                ` : ''}
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline" onclick="App.closeModal()">Cancel</button>
@@ -127,10 +133,17 @@ const Categories = (() => {
 
             if (cat) {
                 DB.update('categories', id, { name, description });
+                const applyAll = document.getElementById('catApplyAllStores');
+                if (applyAll && applyAll.checked) {
+                    DB.syncEditToStores('categories', DB.getById('categories', id));
+                }
                 DB.logAction('category_update', 'categories', id, { name, description });
-                App.toast('Category updated successfully');
+                App.toast(applyAll && applyAll.checked ? 'Category updated everywhere' : 'Category updated (this store only)');
             } else {
                 const rec = DB.insert('categories', { name, description, enabled: true });
+                // Auto-copy to every other store — same reasoning as menu
+                // items, so a new category doesn't need re-typing per store.
+                DB.propagateToStores('categories', rec);
                 DB.logAction('category_add', 'categories', rec.id, { name });
                 App.toast('Category created successfully');
             }
