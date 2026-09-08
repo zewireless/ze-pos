@@ -9,6 +9,9 @@ const Receipt = (() => {
         const restaurantName = DB.getSetting('restaurant_name') || 'ZE-POS';
         const address = DB.getSetting('restaurant_address') || '';
         const phone = DB.getSetting('restaurant_phone') || '';
+        const logo = DB.getSetting('receipt_logo') || '';
+        const accentColor = DB.getSetting('receipt_accent_color') || '#000000';
+        const footerMsg = DB.getSetting('receipt_footer_message') || 'Thank you for your order!\nPlease visit us again.';
 
         const receiptHtml = `
 <!DOCTYPE html>
@@ -20,16 +23,17 @@ const Receipt = (() => {
         body { font-family: 'Courier New', monospace; font-size: 12px; color: #000; background: #fff; }
         .receipt { width: 280px; margin: 0 auto; padding: 10px; }
         .receipt-header { text-align: center; margin-bottom: 8px; }
+        .receipt-header img { max-width: 200px; max-height: 90px; margin-bottom: 6px; }
         .receipt-header h1 { font-size: 18px; margin-bottom: 2px; }
         .receipt-header p { font-size: 11px; color: #555; line-height: 1.4; }
-        .divider { border: none; border-top: 1px dashed #000; margin: 8px 0; }
+        .divider { border: none; border-top: 1px dashed ${accentColor}; margin: 8px 0; }
         .row { display: flex; justify-content: space-between; padding: 2px 0; }
         .row.bold { font-weight: bold; }
         .item-block { margin-bottom: 8px; }
         .item-name { font-weight: bold; }
         .item-meta { font-size: 11px; color: #555; margin-left: 10px; }
-        .total-section { border-top: 2px solid #000; margin-top: 8px; padding-top: 8px; }
-        .total-section .row { font-weight: bold; font-size: 14px; }
+        .total-section { border-top: 2px solid ${accentColor}; margin-top: 8px; padding-top: 8px; }
+        .total-section .row { font-weight: bold; font-size: 14px; color: ${accentColor}; }
         .receipt-footer { text-align: center; margin-top: 12px; font-size: 11px; }
         @media print {
             body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -39,7 +43,7 @@ const Receipt = (() => {
 <body>
     <div class="receipt">
         <div class="receipt-header">
-            <h1>${escapeHtml(restaurantName)}</h1>
+            ${logo ? `<img src="${logo}" alt="${escapeHtml(restaurantName)}">` : `<h1>${escapeHtml(restaurantName)}</h1>`}
             ${address ? `<p>${escapeHtml(address)}</p>` : ''}
             ${phone ? `<p>${escapeHtml(phone)}</p>` : ''}
             <p style="margin-top:4px;">Tel: ${escapeHtml(phone)}</p>
@@ -76,8 +80,7 @@ const Receipt = (() => {
         <hr class="divider">
 
         <div class="receipt-footer">
-            <p>Thank you for your order!</p>
-            <p>Please visit us again.</p>
+            ${footerMsg.split('\n').map(line => `<p>${escapeHtml(line)}</p>`).join('')}
         </div>
     </div>
     <script>window.onload = function() { window.print(); }</script>
@@ -103,6 +106,8 @@ const Receipt = (() => {
         const restaurantName = DB.getSetting('restaurant_name') || 'ZE-POS';
         const address = DB.getSetting('restaurant_address') || '';
         const phone = DB.getSetting('restaurant_phone') || '';
+        const logo = DB.getSetting('receipt_logo') || '';
+        const accentColor = DB.getSetting('receipt_accent_color') || '#000000';
 
         // Hours worked (live for an open shift) + daily OT for the shift's start date
         const endIso = shift.endTime || new Date().toISOString();
@@ -120,23 +125,24 @@ const Receipt = (() => {
         body { font-family: 'Courier New', monospace; font-size: 12px; color: #000; background: #fff; }
         .receipt { width: 280px; margin: 0 auto; padding: 10px; }
         .receipt-header { text-align: center; margin-bottom: 8px; }
+        .receipt-header img { max-width: 200px; max-height: 90px; margin-bottom: 6px; }
         .receipt-header h1 { font-size: 18px; margin-bottom: 2px; }
         .receipt-header p { font-size: 11px; color: #555; line-height: 1.4; }
-        .divider { border: none; border-top: 1px dashed #000; margin: 8px 0; }
+        .divider { border: none; border-top: 1px dashed ${accentColor}; margin: 8px 0; }
         .row { display: flex; justify-content: space-between; padding: 2px 0; }
         .row.bold { font-weight: bold; }
         .item-block { margin-bottom: 8px; }
         .item-name { font-weight: bold; }
         .item-meta { font-size: 11px; color: #555; margin-left: 10px; }
-        .total-section { border-top: 2px solid #000; margin-top: 8px; padding-top: 8px; }
-        .total-section .row { font-weight: bold; font-size: 14px; }
+        .total-section { border-top: 2px solid ${accentColor}; margin-top: 8px; padding-top: 8px; }
+        .total-section .row { font-weight: bold; font-size: 14px; color: ${accentColor}; }
         .receipt-footer { text-align: center; margin-top: 12px; font-size: 11px; }
     </style>
 </head>
 <body>
     <div class="receipt">
         <div class="receipt-header">
-            <h1>${escapeHtml(restaurantName)}</h1>
+            ${logo ? `<img src="${logo}" alt="${escapeHtml(restaurantName)}">` : `<h1>${escapeHtml(restaurantName)}</h1>`}
             ${address ? `<p>${escapeHtml(address)}</p>` : ''}
             <p>Shift Report — ${status}</p>
         </div>
@@ -152,7 +158,7 @@ const Receipt = (() => {
         <div class="row"><span>Ending Cash:</span><span>${shift.endingCash != null ? formatCurrency(shift.endingCash) : '—'}</span></div>
         <div class="row"><span>Cash Diff:</span><span>${shift.cashDifference != null ? formatCurrency(shift.cashDifference) : '—'}</span></div>
         <hr class="divider">
-        <div class="row bold"><span>Total Sales:</span><span>${formatCurrency(shift.totalSales != null ? shift.totalSales : totalSales)}</span></div>
+        <div class="row bold" style="color:${accentColor};"><span>Total Sales:</span><span>${formatCurrency(shift.totalSales != null ? shift.totalSales : totalSales)}</span></div>
         ${orders.length ? `
             <hr class="divider">
             ${orders.map(o => `
