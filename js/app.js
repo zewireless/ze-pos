@@ -352,6 +352,9 @@ const App = (() => {
         const address = DB.getSetting('restaurant_address') || '';
         const phone = DB.getSetting('restaurant_phone') || '';
         const currency = DB.getSetting('currency_symbol') || '$';
+        const logo = DB.getSetting('receipt_logo') || '';
+        const brandColor = DB.getSetting('receipt_accent_color') || '#000000';
+        const footerMsg = DB.getSetting('receipt_footer_message') || '';
 
         el.innerHTML = `
             <div class="card">
@@ -410,6 +413,46 @@ const App = (() => {
                 </div>
             </div>
 
+            <div class="card" style="margin-top:24px;">
+                <div class="card-header">
+                    <h3>🎨 Receipt & Branding</h3>
+                </div>
+                <div class="card-body">
+                    <div class="settings-grid">
+                        <div>
+                            <div class="form-group">
+                                <label>Logo</label>
+                                <div id="brandLogoPreviewWrap" style="margin-bottom:8px;${logo ? '' : 'display:none;'}">
+                                    <img id="brandLogoPreview" src="${logo || ''}" alt="Logo preview" style="max-width:160px;max-height:80px;border:1px solid var(--border);border-radius:6px;padding:4px;background:#fff;">
+                                </div>
+                                <input type="file" accept="image/png,image/jpeg,image/webp" class="form-control" id="brandLogoFile">
+                                <div class="text-muted" style="font-size:12px;margin-top:4px;">Prints at the top of every receipt in place of your restaurant name. Auto-resized — any image works, even a large photo.</div>
+                                ${logo ? `<button class="btn btn-outline btn-sm" id="btnRemoveLogo" style="margin-top:8px;">Remove Logo</button>` : ''}
+                            </div>
+                            <div class="form-group">
+                                <label>Accent Color</label>
+                                <div style="display:flex;align-items:center;gap:10px;">
+                                    <input type="color" id="brandColor" value="${brandColor}" style="width:48px;height:36px;padding:2px;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;">
+                                    <span class="text-muted" style="font-size:12px;">Used for the divider lines and total on printed receipts.</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="form-group">
+                                <label>Receipt Footer Message</label>
+                                <textarea class="form-control" id="brandFooter" rows="3" placeholder="Thank you for your order!&#10;Please visit us again.">${escapeHtml(footerMsg)}</textarea>
+                                <div class="text-muted" style="font-size:12px;margin-top:4px;">One line per line of text — shown at the bottom of every receipt. Leave blank to use the default.</div>
+                            </div>
+                            <div class="form-group">
+                                <label>Preview</label>
+                                <div id="brandReceiptPreview" style="border:1px dashed var(--border);border-radius:8px;padding:14px;font-family:'Courier New',monospace;font-size:11px;text-align:center;background:#fff;color:#000;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="btnSaveBranding" style="margin-top:12px;">Save Branding</button>
+                </div>
+            </div>
+
             ${Auth.isAdmin() ? `
             <div class="card" style="margin-top:24px;">
                 <div class="card-header">
@@ -461,6 +504,88 @@ const App = (() => {
                 currency_symbol: resolvedCurrency,
             });
             toast('Settings saved successfully');
+            renderBrandingPreview(); // name feeds the receipt preview too
+        });
+
+        // ── Branding (logo / accent color / receipt footer) ────────
+        let pendingLogoDataUrl = logo || null;
+
+        // Downscales/re-encodes any uploaded image client-side before it
+        // ever touches the settings table — settings.value is a plain
+        // text column, so an unresized photo (multi-MB) would bloat every
+        // settings fetch for this store. 320px wide is already larger
+        // than a thermal receipt prints (280px), so this stays crisp.
+        function resizeImageFile(file, maxWidth = 320) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onerror = () => reject(new Error('Could not read that file'));
+                reader.onload = () => {
+                    const img = new Image();
+                    img.onerror = () => reject(new Error('Could not read that image'));
+                    img.onload = () => {
+                        const scale = Math.min(1, maxWidth / img.width);
+                        const canvas = document.createElement('canvas');
+                        canvas.width = Math.round(img.width * scale);
+                        canvas.height = Math.round(img.height * scale);
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#fff'; // flatten transparency onto white — receipts print on white paper
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        resolve(canvas.toDataURL('image/jpeg', 0.85));
+                    };
+                    img.src = reader.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function renderBrandingPreview() {
+            const preview = $('#brandReceiptPreview');
+            if (!preview) return;
+            const footer = $('#brandFooter').value.trim() || 'Thank you for your order!\nPlease visit us again.';
+            const color = $('#brandColor').value;
+            const restaurantName = $('#settName').value.trim() || 'Your Restaurant';
+            preview.innerHTML = `
+                ${pendingLogoDataUrl ? `<img src="${pendingLogoDataUrl}" style="max-width:140px;max-height:70px;margin-bottom:6px;">` : `<div style="font-weight:bold;font-size:14px;">${escapeHtml(restaurantName)}</div>`}
+                <div style="border-top:1px dashed ${color};margin:8px 0;"></div>
+                <div style="color:${color};font-weight:bold;">TOTAL ₱250.00</div>
+                <div style="border-top:1px dashed ${color};margin:8px 0;"></div>
+                ${footer.split('\n').map(line => `<div>${escapeHtml(line)}</div>`).join('')}
+            `;
+        }
+        renderBrandingPreview();
+
+        $('#brandLogoFile').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            try {
+                pendingLogoDataUrl = await resizeImageFile(file);
+                renderBrandingPreview();
+            } catch (err) {
+                toast(err.message || 'Could not process that image', 'error');
+            }
+        });
+
+        $('#btnRemoveLogo')?.addEventListener('click', () => {
+            pendingLogoDataUrl = null;
+            $('#brandLogoFile').value = '';
+            renderBrandingPreview();
+            toast('Logo removed — click "Save Branding" to confirm');
+        });
+
+        $('#brandColor').addEventListener('input', renderBrandingPreview);
+        $('#brandFooter').addEventListener('input', renderBrandingPreview);
+
+        $('#btnSaveBranding').addEventListener('click', () => {
+            DB.setSetting('receipt_logo', pendingLogoDataUrl || '');
+            DB.setSetting('receipt_accent_color', $('#brandColor').value);
+            DB.setSetting('receipt_footer_message', $('#brandFooter').value.trim());
+            DB.logAction('settings_update', 'settings', null, {
+                receipt_logo: pendingLogoDataUrl ? '(logo set)' : '(no logo)',
+                receipt_accent_color: $('#brandColor').value,
+                receipt_footer_message: $('#brandFooter').value.trim(),
+            });
+            toast('Branding saved — try Reprint on any order to see it');
         });
 
         $('#btnResetData').addEventListener('click', async () => {
