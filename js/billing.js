@@ -58,7 +58,10 @@ const Billing = (() => {
                 return;
             }
 
-            selectedPlanId = selectedPlanId || (cachedPlans[0] && cachedPlans[0].id) || null;
+            if (!selectedPlanId) {
+                const firstSelectable = cachedPlans.find(p => !(p.duration_type === 'trial' && b.trial_used));
+                selectedPlanId = (firstSelectable || cachedPlans[0] || {}).id || null;
+            }
             el.innerHTML = renderPicker(b, status, periodEnd);
             bindPicker(el);
         } catch (err) {
@@ -77,6 +80,7 @@ const Billing = (() => {
         const [cls, label] = map[status] || map.never;
         let extra = '';
         if (status === 'active' && periodEnd) extra = ` · renews ${App.formatDate(periodEnd.toISOString())}`;
+        if (status === 'overdue' && periodEnd) extra = ` · expired ${App.formatDate(periodEnd.toISOString())}`;
         return `<span class="badge ${cls}">${label}</span>${extra}`;
     }
 
@@ -92,18 +96,22 @@ const Billing = (() => {
         const details = cfg.BUSINESS_PAYMENT_DETAILS || {};
         const payments = (b.payments || []).filter(p => p.status === 'paid');
 
-        const planCards = cachedPlans.length ? cachedPlans.map(p => `
-            <div class="plan-card ${p.id === selectedPlanId ? 'selected' : ''}" data-plan-id="${p.id}"
-                 style="cursor:pointer;border:2px solid ${p.id === selectedPlanId ? 'var(--primary)' : 'var(--border)'};border-radius:12px;padding:16px;margin-bottom:10px;">
+        const trialUsed = !!b.trial_used;
+        const planCards = cachedPlans.length ? cachedPlans.map(p => {
+            const isUsedTrial = p.duration_type === 'trial' && trialUsed;
+            return `
+            <div class="plan-card ${p.id === selectedPlanId && !isUsedTrial ? 'selected' : ''}" data-plan-id="${isUsedTrial ? '' : p.id}"
+                 style="cursor:${isUsedTrial ? 'not-allowed' : 'pointer'};opacity:${isUsedTrial ? '0.55' : '1'};border:2px solid ${p.id === selectedPlanId && !isUsedTrial ? 'var(--primary)' : 'var(--border)'};border-radius:12px;padding:16px;margin-bottom:10px;">
                 <div style="display:flex;align-items:center;justify-content:space-between;">
                     <div>
                         <strong>${App.escapeHtml(p.name)}</strong>
-                        <div class="shift-meta">${fmtDuration(p)}</div>
+                        <div class="shift-meta">${fmtDuration(p)}${isUsedTrial ? ' · Already used' : ''}</div>
                     </div>
                     <div style="font-size:20px;font-weight:800;">${App.escapeHtml(p.currency)} ${parseFloat(p.price_monthly).toFixed(2)}</div>
                 </div>
             </div>
-        `).join('') : '<p class="text-muted">No plans are currently available. Please contact support.</p>';
+        `;
+        }).join('') : '<p class="text-muted">No plans are currently available. Please contact support.</p>';
 
         const methods = [
             { id: 'gcash', label: 'GCash', detail: details.gcash },
@@ -161,6 +169,7 @@ const Billing = (() => {
 
     function bindPicker(el) {
         el.querySelectorAll('[data-plan-id]').forEach(card => {
+            if (!card.dataset.planId) return; // used-up trial card, not selectable
             card.addEventListener('click', () => {
                 selectedPlanId = card.dataset.planId;
                 load(el);
@@ -340,8 +349,10 @@ const Billing = (() => {
                     const client = Supabase.getClient();
                     const { data: plans } = await client.from('plans').select('*').eq('active', true).order('sort_order').order('price_monthly');
                     cachedPlans = plans || [];
-                    selectedPlanId = (cachedPlans[0] && cachedPlans[0].id) || null;
                     const { data: billing } = await client.rpc('get_my_billing');
+                    const trialUsed = !!(billing && billing.trial_used);
+                    const firstSelectable = cachedPlans.find(p => !(p.duration_type === 'trial' && trialUsed));
+                    selectedPlanId = (firstSelectable || cachedPlans[0] || {}).id || null;
                     el.innerHTML = renderPicker(billing || {}, (billing && billing.status) || 'active', billing && billing.period_end ? new Date(billing.period_end) : null);
                     bindPicker(el);
                 } catch (err) {
