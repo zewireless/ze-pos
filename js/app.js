@@ -101,10 +101,12 @@ const App = (() => {
     function subscriptionActive() {
         if (!subscription) return false;
         if (subscription.status !== 'active') return false;
-        if (subscription.periodEnd) {
-            return new Date(subscription.periodEnd).getTime() > Date.now();
-        }
-        return true;
+        // Strict cutoff: no periodEnd means no verified expiry, so it is
+        // NOT treated as unlimited access. Access requires an explicit,
+        // unexpired period end — same rule the server enforces via
+        // workspace_subscription_active().
+        if (!subscription.periodEnd) return false;
+        return new Date(subscription.periodEnd).getTime() > Date.now();
     }
 
     // ── Confirm Dialog ─────────────────────────────────────────
@@ -888,6 +890,25 @@ const App = (() => {
 
         // Navigate to dashboard, or the paywall if there's no active subscription
         navigateTo(subscriptionActive() ? 'dashboard' : 'billing');
+
+        // Strict cutoff: re-check the subscription periodically so a plan
+        // that expires WHILE the app is open (no page navigation in
+        // between) gets bounced to the paywall immediately, instead of
+        // silently working until the next click happens to re-check.
+        setInterval(async () => {
+            try {
+                const c = Supabase.getClient();
+                if (!c) return;
+                const { data: fresh } = await c.rpc('get_my_billing');
+                setSubscription(fresh);
+                if (currentPage !== 'billing' && !subscriptionActive()) {
+                    navigateTo('billing');
+                    toast('Your subscription has expired', 'error');
+                }
+            } catch (err) {
+                console.error('Subscription re-check failed:', err);
+            }
+        }, 60000);
 
         // PWA install prompt
         let deferredPrompt = null;
