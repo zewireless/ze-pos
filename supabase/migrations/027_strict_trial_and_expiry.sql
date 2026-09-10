@@ -1,394 +1,399 @@
-/**
- * Billing – subscription status, plan picker, payment method selection,
- * and payment claim submission for a self-service billing flow.
- *
- * Flow:
- *   1. No active subscription, no pending claim → show plan picker +
- *      payment method selector → client submits a claim (pending).
- *   2. Pending claim exists → show "awaiting review" screen.
- *   3. Active subscription → show manage/renew screen (can also change
- *      plan by submitting a new claim).
- */
-const Billing = (() => {
-    let cachedPlans = [];
-    let selectedPlanId = null;
-    let selectedMethod = 'gcash';
+-- =============================================================
+-- ZE-POS 027 — Fix trial period stacking + strict expiry cutoff
+-- Run AFTER 026_admin_delete_client.sql
+--
+-- Bug: admin_approve_payment() / admin_record_payment() /
+--      admin_assign_plan() all extended a client from
+--      greatest(current_period_end, now()) + duration_days. That's
+--      correct for a RENEWAL of a paid plan (you keep remaining
+--      paid time), but it means a "1-Day Trial" granted to a client
+--      who still has time left on an existing paid plan gets tacked
+--      onto the END of that remaining time — so the trial silently
+--      lasts remaining_days + 1, not 1 day. It also meant a client
+--      could resubmit the free trial claim repeatedly to keep
+--      pushing their access out for free.
+--
+-- Fix:
+--   1. A `duration_type = 'trial'` plan ALWAYS starts from now() —
+--      it never stacks on top of an existing period_end. It behaves
+--      exactly like any other plan in every other respect (same
+--      status/period_end fields, same enforcement).
+--   2. A workspace can only ever redeem the self-service trial once
+--      (submit_payment_claim rejects a repeat trial claim). Admin-
+--      initiated grants (admin_assign_plan / admin_record_payment)
+--      are left to the super admin's discretion, since those are
+--      trusted manual operations, not a self-service loophole.
+--   3. workspace_subscription_active() no longer treats a null
+--      current_period_end as "active forever" — access requires an
+--      explicit, unexpired period_end. Cuts access the instant a
+--      plan (trial or paid) expires, no grace/bypass.
+--   4. get_my_billing() now reports the client's TRUE effective status
+--      ('overdue' once current_period_end has passed) instead of
+--      echoing a stale 'active' flag, and flags whether the trial
+--      has already been used so the UI can grey it out.
+-- Idempotent: safe to re-run.
+-- =============================================================
 
-    function render() {
-        const el = document.getElementById('page-billing');
-        if (!el || !Auth.isLoggedIn()) return;
-        load(el);
-    }
+-- -------------------------------------------------------------
+-- 1. Helper: compute the (days, new period_end) for granting a
+--    plan to a profile. Centralizes the trial-never-stacks rule so
+--    every payment/grant path applies it identically.
+-- -------------------------------------------------------------
+create or replace function public.compute_period_end(
+    p_profile uuid,
+    p_plan_id uuid,
+    p_default_days integer default 30
+)
+returns table(days integer, period_end timestamptz)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+    v_days integer;
+    v_type text;
+begin
+    if p_plan_id is not null then
+        select pl.duration_days, pl.duration_type into v_days, v_type
+        from public.plans pl where pl.id = p_plan_id;
+    end if;
+    v_days := coalesce(v_days, p_default_days);
 
-    async function load(el) {
-        el.innerHTML = `
-            <div class="card">
-                <div class="card-body" style="text-align:center;padding:40px;">
-                    <span class="icon" style="font-size:32px;">⏳</span>
-                    <h3>Loading billing…</h3>
-                </div>
-            </div>
-        `;
+    if v_type = 'trial' then
+        -- Trials never inherit remaining time from a prior plan and
+        -- never stack on repeat grants — always exactly v_days from now.
+        return query select v_days, now() + make_interval(days => v_days);
+    else
+        return query select v_days, greatest(coalesce(
+            (select p.current_period_end from public.profiles p where p.id = p_profile),
+            now()), now()) + make_interval(days => v_days);
+    end if;
+end;
+$$;
 
-        try {
-            const client = Supabase.getClient();
-            const { data: billing } = await client.rpc('get_my_billing');
-            const { data: plans } = await client
-                .from('plans')
-                .select('*')
-                .eq('active', true)
-                .order('sort_order')
-                .order('price_monthly');
-            cachedPlans = plans || [];
-            const b = billing || {};
+-- -------------------------------------------------------------
+-- 2. admin_approve_payment() — use compute_period_end() instead of
+--    always stacking, so approving a trial claim grants exactly the
+--    trial's duration_days regardless of any remaining paid time.
+-- -------------------------------------------------------------
+create or replace function public.admin_approve_payment(p_payment_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_payment public.payments%rowtype;
+    v_days integer;
+    v_period_end timestamptz;
+begin
+    if not public.is_super_admin() then
+        raise exception 'not authorized';
+    end if;
 
-            const status = b.status || 'never';
-            const periodEnd = b.period_end ? new Date(b.period_end) : null;
-            const isActive = status === 'active' && (!periodEnd || periodEnd.getTime() > Date.now());
+    select * into v_payment from public.payments where id = p_payment_id and status = 'pending';
+    if v_payment.id is null then
+        raise exception 'pending payment not found';
+    end if;
 
-            if (b.pending_payment) {
-                el.innerHTML = renderPending(b.pending_payment);
-                bindPending(el, b.pending_payment);
-                return;
-            }
+    select c.days, c.period_end into v_days, v_period_end
+    from public.compute_period_end(v_payment.profile_id, v_payment.plan_id) c;
 
-            if (isActive) {
-                el.innerHTML = renderManage(b);
-                bindManage(el);
-                return;
-            }
+    update public.payments
+       set status = 'paid',
+           period_start = now(),
+           period_end = v_period_end
+     where id = p_payment_id;
 
-            if (!selectedPlanId) {
-                const firstSelectable = cachedPlans.find(p => !(p.duration_type === 'trial' && b.trial_used));
-                selectedPlanId = (firstSelectable || cachedPlans[0] || {}).id || null;
-            }
-            el.innerHTML = renderPicker(b, status, periodEnd);
-            bindPicker(el);
-        } catch (err) {
-            el.innerHTML = `
-                <div class="card">
-                    <div class="card-body">
-                        <p class="text-muted">Could not load billing: ${App.escapeHtml(err.message || err)}</p>
-                    </div>
-                </div>
-            `;
-        }
-    }
+    update public.profiles
+       set subscription_status = 'active',
+           plan_id = coalesce(v_payment.plan_id, plan_id),
+           current_period_end = v_period_end
+     where id = v_payment.profile_id;
 
-    function statusBadge(status, periodEnd) {
-        const map = { active: ['badge-success', 'Active'], overdue: ['badge-danger', 'Overdue'], cancelled: ['badge-warning', 'Cancelled'], never: ['badge-warning', 'No Plan'] };
-        const [cls, label] = map[status] || map.never;
-        let extra = '';
-        if (status === 'active' && periodEnd) extra = ` · renews ${App.formatDate(periodEnd.toISOString())}`;
-        if (status === 'overdue' && periodEnd) extra = ` · expired ${App.formatDate(periodEnd.toISOString())}`;
-        return `<span class="badge ${cls}">${label}</span>${extra}`;
-    }
+    perform public.log_action('payment_approve', 'payment', p_payment_id::text, jsonb_build_object(
+        'profile_id', v_payment.profile_id, 'plan_id', v_payment.plan_id, 'days', v_days
+    ));
+end;
+$$;
 
-    function fmtDuration(p) {
-        const map = { trial: 'Trial', days: 'Days', weeks: 'Weeks', months: 'Months', custom: 'Custom' };
-        const label = map[p.duration_type] || p.duration_type || '';
-        return `${p.duration_days} day${p.duration_days === 1 ? '' : 's'}${label ? ' · ' + label : ''}`;
-    }
+grant execute on function public.admin_approve_payment(uuid) to authenticated;
 
-    // ── Plan picker + payment method selector ─────────────────────
-    function renderPicker(b, status, periodEnd) {
-        const cfg = window.ZE_CONFIG || {};
-        const details = cfg.BUSINESS_PAYMENT_DETAILS || {};
-        const payments = (b.payments || []).filter(p => p.status === 'paid');
+-- -------------------------------------------------------------
+-- 3. admin_record_payment() — same fix for the admin's manual
+--    payment-recording path.
+-- -------------------------------------------------------------
+create or replace function public.admin_record_payment(
+    p_profile uuid,
+    p_amount numeric,
+    p_method text,
+    p_reference text default null,
+    p_plan_id uuid default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_plan_id uuid;
+    v_days integer;
+    v_period_end timestamptz;
+begin
+    if not public.is_super_admin() then
+        raise exception 'not authorized';
+    end if;
 
-        const trialUsed = !!b.trial_used;
-        const planCards = cachedPlans.length ? cachedPlans.map(p => {
-            const isUsedTrial = p.duration_type === 'trial' && trialUsed;
-            return `
-            <div class="plan-card ${p.id === selectedPlanId && !isUsedTrial ? 'selected' : ''}" data-plan-id="${isUsedTrial ? '' : p.id}"
-                 style="cursor:${isUsedTrial ? 'not-allowed' : 'pointer'};opacity:${isUsedTrial ? '0.55' : '1'};border:2px solid ${p.id === selectedPlanId && !isUsedTrial ? 'var(--primary)' : 'var(--border)'};border-radius:12px;padding:16px;margin-bottom:10px;">
-                <div style="display:flex;align-items:center;justify-content:space-between;">
-                    <div>
-                        <strong>${App.escapeHtml(p.name)}</strong>
-                        <div class="shift-meta">${fmtDuration(p)}${isUsedTrial ? ' · Already used' : ''}</div>
-                    </div>
-                    <div style="font-size:20px;font-weight:800;">${App.escapeHtml(p.currency)} ${parseFloat(p.price_monthly).toFixed(2)}</div>
-                </div>
-            </div>
-        `;
-        }).join('') : '<p class="text-muted">No plans are currently available. Please contact support.</p>';
+    v_plan_id := coalesce(p_plan_id, (select plan_id from public.profiles where id = p_profile));
 
-        const methods = [
-            { id: 'gcash', label: 'GCash', detail: details.gcash },
-            { id: 'maya', label: 'Maya', detail: details.maya },
-            { id: 'bank', label: 'Bank Transfer', detail: details.bank },
-        ];
-        const methodTabs = methods.map(m => `
-            <button type="button" class="btn ${m.id === selectedMethod ? 'btn-primary' : 'btn-outline'} btn-sm pay-method-btn" data-method="${m.id}">${m.label}</button>
-        `).join(' ');
+    select c.days, c.period_end into v_days, v_period_end
+    from public.compute_period_end(p_profile, v_plan_id) c;
 
-        const activeMethod = methods.find(m => m.id === selectedMethod) || methods[0];
+    insert into public.payments (profile_id, amount, method, status, reference, source, period_start, period_end)
+    values (p_profile, p_amount, p_method, 'paid', p_reference, 'manual', now(), v_period_end);
 
-        return `
-            <div class="card" style="max-width:640px;margin:0 auto;">
-                <div class="card-header">
-                    <h3>🔒 Choose a Plan</h3>
-                    ${statusBadge(status, periodEnd)}
-                </div>
-                <div class="card-body">
-                    <p class="text-muted">Pick the plan that fits your business, then submit your payment.</p>
+    update public.profiles
+    set subscription_status = 'active',
+        plan_id = coalesce(v_plan_id, plan_id),
+        current_period_end = v_period_end
+    where id = p_profile;
 
-                    <div id="planCards" style="margin:16px 0;">
-                        ${planCards}
-                    </div>
+    perform public.log_action('payment_record', 'profile', p_profile::text, jsonb_build_object(
+        'amount', p_amount, 'method', p_method, 'plan_id', v_plan_id, 'days', v_days
+    ));
+end;
+$$;
 
-                    <h4 style="margin-bottom:8px;">Payment Method</h4>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;" id="methodTabs">
-                        ${methodTabs}
-                        ${cfg.PAYMONGO_ENABLED ? `<button type="button" class="btn ${selectedMethod === 'paymongo' ? 'btn-primary' : 'btn-outline'} btn-sm pay-method-btn" data-method="paymongo">💳 Pay Online</button>` : ''}
-                    </div>
+-- -------------------------------------------------------------
+-- 4. admin_assign_plan() — same fix for handing a client a plan
+--    (e.g. a comp trial) with no payment record.
+-- -------------------------------------------------------------
+create or replace function public.admin_assign_plan(p_profile uuid, p_plan_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_days integer;
+    v_period_end timestamptz;
+begin
+    if not public.is_super_admin() then
+        raise exception 'not authorized';
+    end if;
 
-                    <div id="methodDetail">
-                        ${selectedMethod === 'paymongo' ? `
-                            <p class="form-hint" style="margin-bottom:12px;">You'll be redirected to a secure checkout to pay by GCash, Maya, or card.</p>
-                        ` : `
-                            <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;">
-                                <strong>${App.escapeHtml(activeMethod.label)}:</strong> ${App.escapeHtml(activeMethod.detail || 'See your payment details')}
-                            </div>
-                            <div class="form-group">
-                                <label>Reference Number (optional)</label>
-                                <input type="text" class="form-control" id="payRef" placeholder="e.g. GCash reference #">
-                            </div>
-                        `}
-                    </div>
+    if not exists (select 1 from public.plans where id = p_plan_id) then
+        raise exception 'plan not found';
+    end if;
 
-                    <button class="btn btn-primary" id="btnSubmitClaim" style="width:100%;" ${cachedPlans.length ? '' : 'disabled'}>
-                        ${selectedMethod === 'paymongo' ? '💳 Continue to Checkout' : '✓ Submit Payment'}
-                    </button>
+    select c.days, c.period_end into v_days, v_period_end
+    from public.compute_period_end(p_profile, p_plan_id) c;
 
-                    ${payments.length ? renderPaymentHistory(payments) : ''}
-                </div>
-            </div>
-        `;
-    }
+    update public.profiles
+    set plan_id = p_plan_id,
+        subscription_status = 'active',
+        current_period_end = v_period_end
+    where id = p_profile;
 
-    function bindPicker(el) {
-        el.querySelectorAll('[data-plan-id]').forEach(card => {
-            if (!card.dataset.planId) return; // used-up trial card, not selectable
-            card.addEventListener('click', () => {
-                selectedPlanId = card.dataset.planId;
-                load(el);
-            });
-        });
+    perform public.log_action('plan_assign', 'profile', p_profile::text, jsonb_build_object('plan_id', p_plan_id, 'days', v_days));
+end;
+$$;
 
-        el.querySelectorAll('.pay-method-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                selectedMethod = btn.dataset.method;
-                load(el);
-            });
-        });
+-- -------------------------------------------------------------
+-- 5. submit_payment_claim() — a workspace may only ever redeem the
+--    self-service free trial once. Paid plans are unaffected and can
+--    still be resubmitted/renewed any time.
+-- -------------------------------------------------------------
+create or replace function public.submit_payment_claim(
+    p_plan_id uuid,
+    p_method text,
+    p_reference text default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_profile uuid := public.workspace_of();
+    v_plan public.plans%rowtype;
+    v_id uuid;
+begin
+    if v_profile is null then
+        raise exception 'no workspace found for current user';
+    end if;
 
-        const submitBtn = document.getElementById('btnSubmitClaim');
-        if (submitBtn) {
-            submitBtn.addEventListener('click', async () => {
-                if (!selectedPlanId) { App.toast('Select a plan first', 'error'); return; }
+    select * into v_plan from public.plans where id = p_plan_id and active = true;
+    if v_plan.id is null then
+        raise exception 'plan not found or no longer available';
+    end if;
 
-                if (selectedMethod === 'paymongo') {
-                    const cfg = window.ZE_CONFIG || {};
-                    submitBtn.disabled = true;
-                    submitBtn.textContent = 'Opening checkout…';
-                    try {
-                        const client = Supabase.getClient();
-                        const { data: session } = await client.auth.getSession();
-                        const token = session && session.access_token;
-                        const res = await fetch(cfg.PAYMONGO_CHECKOUT_URL, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (token || '') },
-                            body: JSON.stringify({ planId: selectedPlanId }),
-                        });
-                        const json = await res.json();
-                        if (json.checkout_url) {
-                            window.location.href = json.checkout_url;
-                        } else {
-                            App.toast(json.error || 'Could not start checkout', 'error');
-                            submitBtn.disabled = false;
-                            submitBtn.textContent = '💳 Continue to Checkout';
-                        }
-                    } catch (err) {
-                        App.toast('Checkout error: ' + (err.message || err), 'error');
-                        submitBtn.disabled = false;
-                        submitBtn.textContent = '💳 Continue to Checkout';
-                    }
-                    return;
-                }
+    if p_method not in ('gcash','maya','bank','card','paymongo') then
+        raise exception 'invalid payment method';
+    end if;
 
-                const reference = (document.getElementById('payRef') || {}).value || '';
-                submitBtn.disabled = true;
-                submitBtn.textContent = 'Submitting…';
-                try {
-                    const client = Supabase.getClient();
-                    const { error } = await client.rpc('submit_payment_claim', {
-                        p_plan_id: selectedPlanId,
-                        p_method: selectedMethod,
-                        p_reference: reference.trim() || null,
-                    });
-                    if (error) {
-                        App.toast(error.message || 'Could not submit payment', 'error');
-                        submitBtn.disabled = false;
-                        submitBtn.textContent = '✓ Submit Payment';
-                        return;
-                    }
-                    App.toast('Payment submitted — awaiting confirmation');
-                    load(el);
-                } catch (err) {
-                    App.toast(err.message || 'Could not submit payment', 'error');
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = '✓ Submit Payment';
-                }
-            });
-        }
-    }
+    if exists (select 1 from public.payments where profile_id = v_profile and status = 'pending') then
+        raise exception 'You already have a payment submission awaiting review.';
+    end if;
 
-    // ── Pending claim screen ────────────────────────────────────
-    function renderPending(pending) {
-        return `
-            <div class="card" style="max-width:640px;margin:0 auto;">
-                <div class="card-header">
-                    <h3>⏳ Payment Under Review</h3>
-                    <span class="badge badge-warning">Pending</span>
-                </div>
-                <div class="card-body">
-                    <p class="text-muted">We've received your payment submission and it's awaiting confirmation.</p>
-                    <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px;margin:16px 0;">
-                        <div><strong>Plan:</strong> ${App.escapeHtml(pending.plan_name || '—')}</div>
-                        <div><strong>Amount:</strong> ${App.formatCurrency(pending.amount)}</div>
-                        <div><strong>Method:</strong> ${App.escapeHtml(pending.method)}</div>
-                        <div class="text-muted" style="margin-top:6px;">${App.formatDateTime(pending.created_at)}</div>
-                    </div>
-                    <button class="btn btn-outline" id="btnRefreshPending" style="width:100%;margin-bottom:8px;">↻ Refresh Status</button>
-                    <button class="btn btn-outline btn-danger" id="btnCancelClaim" style="width:100%;">Cancel Submission</button>
-                </div>
-            </div>
-        `;
-    }
+    if v_plan.duration_type = 'trial' and exists (
+        select 1
+        from public.payments pay
+        join public.plans pl on pl.id = pay.plan_id
+        where pay.profile_id = v_profile
+          and pay.status = 'paid'
+          and pl.duration_type = 'trial'
+    ) then
+        raise exception 'The free trial has already been used for this workspace.';
+    end if;
 
-    function bindPending(el, pending) {
-        const refreshBtn = document.getElementById('btnRefreshPending');
-        if (refreshBtn) refreshBtn.addEventListener('click', () => load(el));
+    insert into public.payments (profile_id, plan_id, amount, method, status, reference, source)
+    values (v_profile, v_plan.id, v_plan.price_monthly, p_method, 'pending', p_reference, 'manual')
+    returning id into v_id;
 
-        const cancelBtn = document.getElementById('btnCancelClaim');
-        if (cancelBtn) {
-            cancelBtn.addEventListener('click', async () => {
-                const yes = await App.confirm('Cancel Submission?', 'This will withdraw your pending payment submission.', 'Cancel Submission');
-                if (!yes) return;
-                try {
-                    const client = Supabase.getClient();
-                    const { error } = await client.rpc('cancel_payment_claim', { p_payment_id: pending.id });
-                    if (error) { App.toast(error.message || 'Could not cancel', 'error'); return; }
-                    App.toast('Submission cancelled');
-                    load(el);
-                } catch (err) {
-                    App.toast(err.message || 'Could not cancel', 'error');
-                }
-            });
-        }
-    }
+    perform public.log_action('payment_claim_submit', 'payment', v_id::text, jsonb_build_object(
+        'plan_id', v_plan.id, 'plan_name', v_plan.name, 'method', p_method, 'amount', v_plan.price_monthly
+    ));
 
-    // ── Active subscription: manage/renew screen ────────────────
-    function renderManage(b) {
-        const payments = (b.payments || []).filter(p => p.status === 'paid');
-        const periodEnd = b.period_end ? App.formatDate(new Date(b.period_end).toISOString()) : '—';
+    return v_id;
+end;
+$$;
 
-        return `
-            <div class="card" style="max-width:640px;margin:0 auto;">
-                <div class="card-header">
-                    <h3>💳 Billing & Subscription</h3>
-                    <span class="badge badge-success">Active</span>
-                </div>
-                <div class="card-body">
-                    <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));">
-                        <div class="stat-card">
-                            <div class="stat-icon blue">📋</div>
-                            <div class="stat-info">
-                                <div class="stat-label">Plan</div>
-                                <div class="stat-value">${App.escapeHtml(b.plan_name || '—')}</div>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon green">📅</div>
-                            <div class="stat-info">
-                                <div class="stat-label">Renews</div>
-                                <div class="stat-value" style="font-size:0.95rem;">${periodEnd}</div>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon orange">💰</div>
-                            <div class="stat-info">
-                                <div class="stat-label">Price</div>
-                                <div class="stat-value">${b.currency || '₱'} ${b.price_monthly != null ? parseFloat(b.price_monthly).toFixed(2) : '—'}</div>
-                            </div>
-                        </div>
-                    </div>
+grant execute on function public.submit_payment_claim(uuid, text, text) to authenticated;
 
-                    <p class="form-hint" style="margin:14px 0;">
-                        Want to switch plans or renew early? You can submit a new payment any time.
-                    </p>
-                    <button class="btn btn-primary" id="btnChangePlan" style="width:100%;margin-bottom:8px;">Change Plan / Renew</button>
-                    <button class="btn btn-outline" id="btnRefreshBilling" style="width:100%;">↻ Refresh Status</button>
+-- -------------------------------------------------------------
+-- 6. workspace_subscription_active() — strict cutoff: a null
+--    current_period_end no longer grants unlimited access. Access
+--    requires status = 'active' AND an unexpired current_period_end.
+-- -------------------------------------------------------------
+create or replace function public.workspace_subscription_active()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+    select coalesce((
+        select p.is_super_admin
+            or (p.subscription_status = 'active'
+                and p.current_period_end is not null
+                and p.current_period_end > now())
+        from public.profiles p
+        where p.id = public.workspace_of()
+    ), false);
+$$;
 
-                    ${payments.length ? renderPaymentHistory(payments) : ''}
-                </div>
-            </div>
-        `;
-    }
+-- -------------------------------------------------------------
+-- 7. get_my_billing() — report the TRUE effective status (an
+--    'active' row whose current_period_end has already passed reads
+--    as 'overdue', matching what workspace_subscription_active()
+--    actually enforces) and flag whether the trial's been used.
+-- -------------------------------------------------------------
+create or replace function public.get_my_billing()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    result jsonb;
+begin
+    select jsonb_build_object(
+        'status', case
+            when prof.subscription_status = 'active'
+                 and (prof.current_period_end is null or prof.current_period_end <= now())
+            then 'overdue'
+            else prof.subscription_status
+        end,
+        'period_end', prof.current_period_end,
+        'business_name', prof.business_name,
+        'plan_id', prof.plan_id,
+        'plan_name', plan.name,
+        'plan_features', coalesce(plan.features, '{}'::text[]),
+        'price_monthly', plan.price_monthly,
+        'currency', plan.currency,
+        'trial_used', exists (
+            select 1
+            from public.payments pay
+            join public.plans pl on pl.id = pay.plan_id
+            where pay.profile_id = prof.id
+              and pay.status = 'paid'
+              and pl.duration_type = 'trial'
+        ),
+        'payments', coalesce((
+            select jsonb_agg(jsonb_build_object(
+                'amount', pay.amount, 'method', pay.method, 'status', pay.status,
+                'reference', pay.reference, 'source', pay.source, 'created_at', pay.created_at
+            ) order by pay.created_at desc)
+            from public.payments pay where pay.profile_id = prof.id
+        ), '[]'::jsonb),
+        'pending_payment', (
+            select jsonb_build_object(
+                'id', pay.id, 'amount', pay.amount, 'method', pay.method,
+                'plan_name', pl.name, 'created_at', pay.created_at
+            )
+            from public.payments pay
+            left join public.plans pl on pl.id = pay.plan_id
+            where pay.profile_id = prof.id and pay.status = 'pending'
+            order by pay.created_at desc
+            limit 1
+        )
+    ) into result
+    from public.profiles prof
+    left join public.plans plan on plan.id = prof.plan_id
+    where prof.id = public.workspace_of();
 
-    function bindManage(el) {
-        const refreshBtn = document.getElementById('btnRefreshBilling');
-        if (refreshBtn) refreshBtn.addEventListener('click', () => load(el));
+    return coalesce(result, '{}'::jsonb);
+end;
+$$;
 
-        const changeBtn = document.getElementById('btnChangePlan');
-        if (changeBtn) {
-            changeBtn.addEventListener('click', async () => {
-                selectedPlanId = null;
-                try {
-                    const client = Supabase.getClient();
-                    const { data: plans } = await client.from('plans').select('*').eq('active', true).order('sort_order').order('price_monthly');
-                    cachedPlans = plans || [];
-                    const { data: billing } = await client.rpc('get_my_billing');
-                    const trialUsed = !!(billing && billing.trial_used);
-                    const firstSelectable = cachedPlans.find(p => !(p.duration_type === 'trial' && trialUsed));
-                    selectedPlanId = (firstSelectable || cachedPlans[0] || {}).id || null;
-                    el.innerHTML = renderPicker(billing || {}, (billing && billing.status) || 'active', billing && billing.period_end ? new Date(billing.period_end) : null);
-                    bindPicker(el);
-                } catch (err) {
-                    App.toast(err.message || 'Could not load plans', 'error');
-                }
-            });
-        }
-    }
+grant execute on function public.get_my_billing() to anon, authenticated;
 
-    function renderPaymentHistory(payments) {
-        return `
-            <h4 style="margin:20px 0 8px;">Payment History</h4>
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Amount</th>
-                            <th>Method</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${payments.map(p => `
-                            <tr>
-                                <td>${App.formatDateTime(p.created_at)}</td>
-                                <td><strong>${App.formatCurrency(p.amount)}</strong></td>
-                                <td class="text-muted">${App.escapeHtml(p.method)}</td>
-                                <td><span class="badge badge-success">Paid</span></td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
-    }
-
-    return { render };
-})();
+-- -------------------------------------------------------------
+-- 8. admin_list_clients() — same truthful-status fix for the admin
+--    dashboard: a lapsed client shows as 'overdue' there too, instead
+--    of a stale 'active' badge (this also drives the dashboard's
+--    Cancel/Delete button logic, which keys off this same column).
+-- -------------------------------------------------------------
+create or replace function public.admin_list_clients()
+returns table (
+    id                  uuid,
+    business_name       text,
+    email               text,
+    plan_id             uuid,
+    plan_name           text,
+    subscription_status text,
+    current_period_end  timestamptz,
+    last_payment_at     timestamptz,
+    created_at          timestamptz,
+    is_super_admin      boolean
+)
+language sql
+security definer
+set search_path = public
+as $$
+    select
+        p.id,
+        p.business_name,
+        p.email,
+        p.plan_id,
+        pl.name,
+        case
+            when p.subscription_status = 'active'
+                 and (p.current_period_end is null or p.current_period_end <= now())
+            then 'overdue'
+            else p.subscription_status
+        end,
+        p.current_period_end,
+        (select max(pay.created_at)
+           from public.payments pay
+          where pay.profile_id = p.id),
+        p.created_at,
+        p.is_super_admin
+    from public.profiles p
+    left join public.plans pl on pl.id = p.plan_id
+    where public.is_super_admin()
+      and p.id = p.workspace_id
+    order by p.created_at desc;
+$$;
