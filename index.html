@@ -1,1072 +1,901 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ZE Payroll — Attendance to Payslip, Automatically</title>
-<meta name="description" content="ZE Payroll turns QR time-ins and DTRs into ready-to-send payslips, with PH statutory deductions and OT rules handled automatically.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<style>
-    :root{
-        --ink:#0b1020;
-        --ink-soft:#131a30;
-        --ink-line:rgba(255,255,255,.09);
-        --paper:#f6f7fb;
-        --paper-dim:#eceff8;
-        --card:#ffffff;
-        --blue:#2563eb;
-        --blue-deep:#17419e;
-        --blue-bright:#3b82f6;
-        --lime:#c3ff4d;
-        --lime-deep:#8fd400;
-        --on-dark:#eef1fb;
-        --on-dark-dim:#9aa4c4;
-        --on-light:#0f1430;
-        --on-light-dim:#5b6280;
-        --radius:16px;
-        --radius-sm:10px;
-        --shadow:0 24px 60px -24px rgba(11,16,32,.45);
-        --shadow-sm:0 10px 24px -12px rgba(11,16,32,.25);
-        --display:'Space Grotesk', sans-serif;
-        --body:'Manrope', sans-serif;
-    }
-    *{box-sizing:border-box; margin:0; padding:0;}
-    html{scroll-behavior:smooth;}
-    body{
-        font-family:var(--body);
-        color:var(--on-light);
-        background:var(--paper);
-        line-height:1.55;
-        -webkit-font-smoothing:antialiased;
-    }
-    img,svg{display:block; max-width:100%;}
-    a{color:inherit; text-decoration:none;}
-    ul{list-style:none;}
-    button{font-family:inherit; cursor:pointer;}
-    .wrap{max-width:1180px; margin:0 auto; padding:0 24px;}
-    h1,h2,h3,h4{font-family:var(--display); letter-spacing:-0.01em;}
-    ::selection{background:var(--lime); color:var(--ink);}
-
-    /* ---------- focus visibility ---------- */
-    a:focus-visible, button:focus-visible{
-        outline:2px solid var(--blue-bright);
-        outline-offset:3px;
-        border-radius:6px;
-    }
-
-    /* reduced motion */
-    @media (prefers-reduced-motion: reduce){
-        *{animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; scroll-behavior:auto !important;}
-    }
-
-    /* ============ NAVBAR ============ */
-    .nav{
-        position:fixed; top:0; left:0; right:0; z-index:200;
-        padding:20px 0;
-        transition:padding .35s ease, background .35s ease, box-shadow .35s ease;
-    }
-    .nav-inner{
-        display:flex; align-items:center; justify-content:space-between; gap:20px;
-        background:rgba(11,16,32,.32);
-        border:1px solid rgba(255,255,255,.08);
-        backdrop-filter:blur(14px);
-        -webkit-backdrop-filter:blur(14px);
-        border-radius:16px;
-        padding:12px 18px;
-        transition:background .35s ease, box-shadow .35s ease, border-color .35s ease, padding .35s ease;
-    }
-    .nav.scrolled{padding:12px 0;}
-    .nav.scrolled .nav-inner{
-        background:rgba(9,13,26,.82);
-        box-shadow:0 14px 34px -18px rgba(0,0,0,.55);
-        border-color:rgba(255,255,255,.12);
-        padding:9px 18px;
-    }
-    .brand{display:flex; align-items:center; gap:10px; font-family:var(--display); font-weight:700; font-size:18px; color:var(--on-dark);}
-    .brand-mark{
-        width:34px; height:34px; border-radius:9px;
-        background:linear-gradient(135deg, var(--blue-bright), var(--blue-deep));
-        display:flex; align-items:center; justify-content:center;
-        font-family:var(--display); font-weight:700; font-size:16px; color:#fff;
-        box-shadow:0 6px 16px -6px rgba(37,99,235,.7);
-    }
-    .nav-links{display:flex; align-items:center; gap:28px;}
-    .nav-links a{
-        font-size:14.5px; font-weight:500; color:var(--on-dark-dim);
-        transition:color .2s ease;
-    }
-    .nav-links a:hover{color:var(--on-dark);}
-    .nav-actions{display:flex; align-items:center; gap:10px;}
-    .nav-toggle{
-        display:none; width:38px; height:38px; border-radius:9px; border:1px solid var(--ink-line);
-        background:transparent; color:var(--on-dark); align-items:center; justify-content:center; font-size:16px;
-    }
-
-    /* ---------- buttons ---------- */
-    .btn{
-        display:inline-flex; align-items:center; justify-content:center; gap:8px;
-        border:none; border-radius:10px; font-weight:600; font-size:14.5px;
-        padding:11px 20px; white-space:nowrap; transition:transform .18s ease, box-shadow .18s ease, background .18s ease, color .18s ease;
-    }
-    .btn:active{transform:translateY(1px);}
-    .btn-ghost{background:transparent; color:var(--on-dark); border:1px solid rgba(255,255,255,.18);}
-    .btn-ghost:hover{background:rgba(255,255,255,.08);}
-    .btn-lime{background:var(--lime); color:#132000;}
-    .btn-lime:hover{background:var(--lime-deep); box-shadow:0 10px 24px -8px rgba(140,220,0,.55);}
-    .btn-primary{background:var(--blue); color:#fff;}
-    .btn-primary:hover{background:var(--blue-deep); box-shadow:0 10px 24px -8px rgba(37,99,235,.55);}
-    .btn-outline-dark{background:transparent; color:var(--on-light); border:1px solid rgba(15,20,48,.16);}
-    .btn-outline-dark:hover{background:rgba(15,20,48,.05);}
-    .btn-block{width:100%;}
-    .btn-lg{padding:14px 26px; font-size:15.5px;}
-
-    /* ============ HERO ============ */
-    .hero{
-        position:relative; overflow:hidden;
-        background:
-            radial-gradient(60% 55% at 82% 8%, rgba(37,99,235,.35), transparent 60%),
-            radial-gradient(45% 40% at 8% 92%, rgba(195,255,77,.12), transparent 60%),
-            linear-gradient(180deg, var(--ink) 0%, var(--ink-soft) 100%);
-        padding:168px 0 120px;
-        color:var(--on-dark);
-    }
-    .hero-grid{
-        display:grid; grid-template-columns:1.05fr .95fr; gap:56px; align-items:center;
-    }
-    .eyebrow-pill{
-        display:inline-flex; align-items:center; gap:8px;
-        border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.04);
-        border-radius:999px; padding:7px 14px; font-size:13px; color:var(--on-dark-dim); margin-bottom:22px;
-    }
-    .eyebrow-pill .dot{width:7px; height:7px; border-radius:50%; background:var(--lime); box-shadow:0 0 0 0 rgba(195,255,77,.6); animation:pulse-dot 2.2s ease-in-out infinite;}
-    @keyframes pulse-dot{
-        0%{box-shadow:0 0 0 0 rgba(195,255,77,.55);}
-        70%{box-shadow:0 0 0 9px rgba(195,255,77,0);}
-        100%{box-shadow:0 0 0 0 rgba(195,255,77,0);}
-    }
-    .hero h1{
-        font-size:clamp(34px, 4.6vw, 58px); font-weight:700; line-height:1.06; letter-spacing:-0.02em;
-        max-width:19ch;
-    }
-    .hero p.lead{
-        margin-top:22px; font-size:17.5px; color:var(--on-dark-dim); max-width:46ch;
-    }
-    .hero-ctas{display:flex; align-items:center; gap:14px; margin-top:34px; flex-wrap:wrap;}
-    .hero-note{margin-top:16px; font-size:13px; color:var(--on-dark-dim);}
-    .hero-stats{display:flex; gap:34px; margin-top:52px; flex-wrap:wrap;}
-    .hero-stat b{display:block; font-family:var(--display); font-size:24px; color:#fff;}
-    .hero-stat span{font-size:13px; color:var(--on-dark-dim);}
-
-    /* ---- floating payslip mock in hero ---- */
-    .hero-visual{position:relative; height:460px;}
-    .float-card{
-        position:absolute; border-radius:var(--radius); background:var(--card);
-        box-shadow:var(--shadow); color:var(--on-light); overflow:hidden;
-    }
-    .payslip-card{
-        width:320px; right:10px; top:6px; padding:22px;
-        animation:float-a 7s ease-in-out infinite;
-    }
-    .payslip-head{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px;}
-    .payslip-head b{font-family:var(--display); font-size:15px;}
-    .payslip-head span{font-size:11.5px; color:var(--on-light-dim);}
-    .payslip-badge{background:#e8f7ee; color:#0f9d58; font-size:11px; font-weight:700; border-radius:999px; padding:3px 9px;}
-    .payslip-row{display:flex; justify-content:space-between; font-size:12.5px; padding:7px 0; border-bottom:1px dashed rgba(15,20,48,.1);}
-    .payslip-row span:first-child{color:var(--on-light-dim);}
-    .payslip-net{display:flex; justify-content:space-between; align-items:baseline; margin-top:14px; padding-top:14px; border-top:1px solid rgba(15,20,48,.1);}
-    .payslip-net span{font-size:12.5px; color:var(--on-light-dim);}
-    .payslip-net b{font-family:var(--display); font-size:22px; color:var(--blue-deep);}
-
-    .qr-card{
-        width:190px; left:0; bottom:26px; padding:16px; text-align:center;
-        animation:float-b 6s ease-in-out infinite;
-    }
-    .qr-card .qr-box{
-        width:100%; aspect-ratio:1; border-radius:10px; margin-bottom:10px;
-        background:
-            repeating-linear-gradient(90deg, #0f1430 0 6px, transparent 6px 12px),
-            repeating-linear-gradient(0deg, #0f1430 0 6px, transparent 6px 12px);
-        background-blend-mode:multiply; background-color:#fff;
-        opacity:.9;
-    }
-    .qr-card p{font-size:11.5px; font-weight:600;}
-    .qr-card small{font-size:10.5px; color:var(--on-light-dim);}
-    .scan-toast{
-        position:absolute; left:150px; bottom:118px; width:198px; padding:12px 14px;
-        display:flex; gap:10px; align-items:center; animation:float-c 5.5s ease-in-out infinite;
-    }
-    .scan-toast i{color:#0f9d58;}
-    .scan-toast b{display:block; font-size:12px;}
-    .scan-toast span{font-size:10.5px; color:var(--on-light-dim);}
-
-    @keyframes float-a{0%,100%{transform:translateY(0px);}50%{transform:translateY(-14px);}}
-    @keyframes float-b{0%,100%{transform:translateY(0px);}50%{transform:translateY(10px);}}
-    @keyframes float-c{0%,100%{transform:translateY(0px);}50%{transform:translateY(-9px);}}
-
-    /* ============ SECTION SCAFFOLDING ============ */
-    section{padding:108px 0;}
-    .section-head{max-width:640px; margin-bottom:56px;}
-    .section-head .kicker{font-size:14px; font-weight:600; color:var(--blue);}
-    .section-head h2{font-size:clamp(28px, 3.2vw, 40px); margin-top:10px; line-height:1.12;}
-    .section-head p{margin-top:14px; font-size:16px; color:var(--on-light-dim);}
-    .section-head.on-dark p{color:var(--on-dark-dim);}
-    .section-head.on-dark .kicker{color:var(--lime);}
-
-    /* ============ FEATURES ============ */
-    .feat-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:26px;}
-    .feat-card{
-        background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow-sm);
-        overflow:hidden; display:flex; flex-direction:column;
-        border:1px solid rgba(15,20,48,.05);
-    }
-    .feat-visual{
-        height:196px; padding:16px; background:var(--paper-dim);
-        display:flex; align-items:center; justify-content:center;
-        border-bottom:1px solid rgba(15,20,48,.06);
-        overflow:hidden;
-    }
-    .feat-visual img{
-        max-width:100%; max-height:100%; width:auto; height:auto;
-        object-fit:contain; border-radius:8px;
-        box-shadow:0 10px 26px -12px rgba(15,20,48,.4);
-    }
-    .feat-body{padding:22px 22px 26px;}
-    .feat-body h3{font-size:17px; margin-bottom:8px;}
-    .feat-body p{font-size:14px; color:var(--on-light-dim);}
-
-    /* mini-mockup: QR scan (no real screenshot yet for the kiosk flow) */
-    .mock-qr{display:flex; flex-direction:column; align-items:center; gap:8px;}
-    .mock-qr-box{width:78px; height:78px; border-radius:8px; background:#fff; box-shadow:0 4px 10px -6px rgba(15,20,48,.25);
-        background-image:repeating-linear-gradient(90deg,#0f1430 0 5px, transparent 5px 10px), repeating-linear-gradient(0deg,#0f1430 0 5px, transparent 5px 10px);
-        background-blend-mode:multiply; background-color:#fff;}
-    .mock-qr-pill{font-size:10px; font-weight:700; background:#fff; padding:5px 10px; border-radius:999px; box-shadow:0 4px 10px -6px rgba(15,20,48,.25); color:#0f9d58;}
-
-    /* ============ EXPLORE / COMMAND CENTER DEMO ============ */
-    .explore-wrap{
-        background:linear-gradient(180deg, var(--ink) 0%, var(--ink-soft) 100%); color:var(--on-dark);
-    }
-    .demo-shell{
-        display:flex; border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow);
-        border:1px solid rgba(255,255,255,.08); min-height:560px; background:#0b0f1c;
-    }
-    .demo-sidebar{
-        width:232px; flex-shrink:0; background:#080b15; padding:18px 12px;
-        border-right:1px solid rgba(255,255,255,.06);
-        display:flex; flex-direction:column;
-    }
-    .demo-brand{
-        display:flex; align-items:center; gap:10px; padding:6px 8px 18px; margin-bottom:8px;
-        border-bottom:1px solid rgba(255,255,255,.08); color:#fff; font-weight:700; font-family:var(--display);
-    }
-    .demo-nav-label{font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--on-dark-dim); padding:14px 10px 6px;}
-    .demo-nav-item{
-        display:flex; align-items:center; gap:11px; width:100%; text-align:left; padding:10px 10px;
-        border:none; background:none; border-radius:9px; color:var(--on-dark-dim); font-size:13.5px; font-weight:500;
-        cursor:pointer; transition:background .15s ease, color .15s ease;
-    }
-    .demo-nav-item i{width:16px; text-align:center; font-size:13px;}
-    .demo-nav-item:hover{background:rgba(255,255,255,.05); color:#fff;}
-    .demo-nav-item.active{background:rgba(37,99,235,.22); color:#fff; box-shadow:inset 3px 0 0 var(--blue-bright);}
-    .demo-sidebar-foot{margin-top:auto; padding-top:14px;}
-    .demo-panel-area{flex:1; padding:30px 32px; overflow:auto; background:#0b0f1c;}
-    .demo-panel{display:none; animation:demo-fade .35s ease;}
-    .demo-panel.active{display:block;}
-    @keyframes demo-fade{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);}}
-    .demo-panel-title{font-family:var(--display); font-size:19px; color:#fff; margin-bottom:3px;}
-    .demo-panel-sub{font-size:13px; color:var(--on-dark-dim); margin-bottom:22px;}
-
-    .demo-stat-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:26px;}
-    .demo-stat-card{background:#131a30; border:1px solid rgba(255,255,255,.06); border-radius:12px; padding:16px; display:flex; gap:12px; align-items:center;}
-    .demo-stat-icon{width:38px; height:38px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:15px; flex-shrink:0;}
-    .demo-stat-card b{display:block; font-family:var(--display); font-size:19px; color:#fff; line-height:1.2;}
-    .demo-stat-card span{font-size:11.5px; color:var(--on-dark-dim);}
-
-    .demo-grid-2{display:grid; grid-template-columns:1.2fr 1fr; gap:16px;}
-    .demo-card{background:#131a30; border:1px solid rgba(255,255,255,.06); border-radius:12px; padding:18px;}
-    .demo-card h4{font-size:13px; color:#fff; margin-bottom:14px; font-weight:600;}
-    .demo-list-row{display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px dashed rgba(255,255,255,.07); font-size:12.5px;}
-    .demo-list-row:last-child{border-bottom:none;}
-    .demo-list-name{color:#fff; font-weight:600;}
-    .demo-list-sub{color:var(--on-dark-dim); font-size:11.5px;}
-
-    .demo-pill{font-size:10.5px; font-weight:700; padding:3px 9px; border-radius:999px;}
-    .demo-pill.ok{background:rgba(34,197,94,.16); color:#4ade80;}
-    .demo-pill.warn{background:rgba(234,179,8,.16); color:#fbbf24;}
-
-    .demo-bars{display:flex; align-items:flex-end; gap:8px; height:96px; margin-top:6px;}
-    .demo-bar{flex:1; background:linear-gradient(180deg,#4ade80,#22c55e); border-radius:4px 4px 0 0; position:relative;}
-    .demo-bar span{position:absolute; bottom:-18px; left:0; right:0; text-align:center; font-size:9.5px; color:var(--on-dark-dim);}
-
-    .demo-table{width:100%; border-collapse:collapse; font-size:12.5px;}
-    .demo-table th{text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--on-dark-dim); padding:0 10px 10px; font-weight:600;}
-    .demo-table td{padding:11px 10px; color:#fff; border-top:1px solid rgba(255,255,255,.06);}
-    .demo-table tr:hover td{background:rgba(255,255,255,.02);}
-    .demo-table td.dim{color:var(--on-dark-dim);}
-    .demo-table td.num{text-align:right; font-variant-numeric:tabular-nums;}
-    .demo-table th.num{text-align:right;}
-
-    .demo-qr-row{display:flex; gap:28px; align-items:center; flex-wrap:wrap;}
-    .demo-qr-box{
-        width:150px; height:150px; border-radius:10px; background:#fff; padding:14px; flex-shrink:0;
-        display:flex; align-items:center; justify-content:center;
-    }
-    .demo-qr-box .qr-mock{
-        width:100%; height:100%; border-radius:4px;
-        background:repeating-linear-gradient(90deg,#0f1430 0 7px, transparent 7px 14px), repeating-linear-gradient(0deg,#0f1430 0 7px, transparent 7px 14px);
-        background-blend-mode:multiply; background-color:#fff;
-    }
-    .demo-scan-feed{flex:1; min-width:220px;}
-    .demo-scan-item{display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px dashed rgba(255,255,255,.07); font-size:12.5px;}
-    .demo-scan-item:last-child{border-bottom:none;}
-    .demo-scan-item i{color:#4ade80;}
-
-    .demo-settings-row{display:flex; justify-content:space-between; align-items:center; padding:13px 0; border-bottom:1px solid rgba(255,255,255,.06); font-size:13px;}
-    .demo-settings-row:last-child{border-bottom:none;}
-    .demo-settings-row .label{color:#fff; font-weight:500;}
-    .demo-settings-row .desc{color:var(--on-dark-dim); font-size:11.5px; margin-top:2px;}
-    .demo-toggle{width:38px; height:21px; border-radius:999px; background:#22c55e; position:relative; flex-shrink:0;}
-    .demo-toggle::after{content:''; position:absolute; top:2px; right:2px; width:17px; height:17px; border-radius:50%; background:#fff;}
-    .demo-toggle.off{background:rgba(255,255,255,.14);}
-    .demo-toggle.off::after{right:auto; left:2px;}
-
-    .demo-report-summary{background:#131a30; border:1px solid rgba(255,255,255,.06); border-radius:12px; padding:22px; max-width:460px;}
-    .demo-report-row{display:flex; justify-content:space-between; padding:9px 0; font-size:13px; border-bottom:1px dashed rgba(255,255,255,.08);}
-    .demo-report-row.total{border-bottom:none; border-top:1px solid rgba(255,255,255,.14); margin-top:4px; padding-top:14px; font-family:var(--display); font-size:16px; color:#fff;}
-    .demo-report-row .lbl{color:var(--on-dark-dim);}
-    .demo-report-row.total .lbl{color:#fff;}
-    .demo-report-row .neg{color:#f87171;}
-
-    .demo-cta{text-align:center; margin-top:26px;}
-    .demo-cta p{color:var(--on-dark-dim); font-size:13px; margin-bottom:14px;}
-
-    @media (max-width:860px){
-        .demo-shell{flex-direction:column;}
-        .demo-sidebar{width:100%; flex-direction:row; overflow-x:auto; gap:4px; padding:12px;}
-        .demo-brand, .demo-nav-label, .demo-sidebar-foot{display:none;}
-        .demo-nav-item{flex-shrink:0; white-space:nowrap;}
-        .demo-stat-grid{grid-template-columns:repeat(2,1fr);}
-        .demo-grid-2{grid-template-columns:1fr;}
-        .demo-panel-area{padding:22px 18px;}
-    }
-
-    /* ============ HOW IT WORKS ============ */
-    .how-wrap{
-        background:linear-gradient(180deg, var(--paper) 0%, var(--paper-dim) 100%);
-    }
-    .how-steps{position:relative; display:grid; grid-template-columns:repeat(4,1fr); gap:22px;}
-    .how-steps::before{
-        content:''; position:absolute; top:27px; left:12%; right:12%; height:2px;
-        background:repeating-linear-gradient(90deg, rgba(15,20,48,.16) 0 8px, transparent 8px 16px);
-        z-index:0;
-    }
-    .how-step{position:relative; z-index:1;}
-    .how-num{
-        width:54px; height:54px; border-radius:50%; background:var(--card); border:1px solid rgba(15,20,48,.08);
-        display:flex; align-items:center; justify-content:center; font-family:var(--display); font-weight:700; font-size:19px;
-        color:var(--blue-deep); box-shadow:var(--shadow-sm); margin-bottom:18px;
-    }
-    .how-step h3{font-size:16px; margin-bottom:8px;}
-    .how-step p{font-size:13.5px; color:var(--on-light-dim);}
-
-    /* ============ PRICING ============ */
-    .pricing-wrap{
-        background:linear-gradient(180deg, var(--ink) 0%, var(--ink-soft) 100%); color:var(--on-dark);
-    }
-    .price-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:24px; align-items:stretch;}
-    .price-card{
-        background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1); border-radius:var(--radius);
-        padding:30px 26px; display:flex; flex-direction:column;
-    }
-    .price-card.featured{
-        background:linear-gradient(165deg, rgba(195,255,77,.1), rgba(255,255,255,.04));
-        border-color:rgba(195,255,77,.4);
-        position:relative;
-    }
-    .price-tag{
-        position:absolute; top:-13px; left:26px; background:var(--lime); color:#132000;
-        font-size:11.5px; font-weight:700; padding:4px 12px; border-radius:999px;
-    }
-    .price-name{font-size:14.5px; font-weight:600; color:var(--on-dark-dim); margin-bottom:14px;}
-    .price-amount{display:flex; align-items:baseline; gap:6px; margin-bottom:4px;}
-    .price-amount b{font-family:var(--display); font-size:42px;}
-    .price-amount span{font-size:14px; color:var(--on-dark-dim);}
-    .price-sub{font-size:12.5px; color:var(--on-dark-dim); margin-bottom:22px;}
-    .price-feats{margin-bottom:28px; flex:1;}
-    .price-feats li{display:flex; gap:9px; align-items:flex-start; font-size:13.5px; padding:6px 0; color:var(--on-dark-dim);}
-    .price-feats li i{color:var(--lime); margin-top:3px; font-size:12px;}
-
-    /* ============ FAQ ============ */
-    .faq-list{max-width:760px;}
-    .faq-item{border-bottom:1px solid rgba(15,20,48,.1);}
-    .faq-q{
-        width:100%; background:none; border:none; text-align:left; padding:20px 0;
-        display:flex; justify-content:space-between; align-items:center; gap:20px;
-        font-family:var(--display); font-size:16px; font-weight:600; color:var(--on-light);
-    }
-    .faq-q i{transition:transform .25s ease; color:var(--blue); flex-shrink:0;}
-    .faq-item.open .faq-q i{transform:rotate(45deg);}
-    .faq-a{max-height:0; overflow:hidden; transition:max-height .3s ease;}
-    .faq-a p{padding-bottom:20px; font-size:14.5px; color:var(--on-light-dim); max-width:64ch;}
-
-    /* ============ FINAL CTA ============ */
-    .cta-band{
-        background:linear-gradient(120deg, var(--blue-deep), var(--blue));
-        border-radius:24px; padding:56px; color:#fff; text-align:center;
-        position:relative; overflow:hidden;
-    }
-    .cta-band::after{
-        content:''; position:absolute; inset:0;
-        background:radial-gradient(40% 60% at 85% 20%, rgba(195,255,77,.25), transparent 60%);
-    }
-    .cta-band h2{position:relative; font-size:clamp(24px,3vw,34px); margin-bottom:14px;}
-    .cta-band p{position:relative; color:rgba(255,255,255,.82); margin-bottom:26px; max-width:50ch; margin-left:auto; margin-right:auto;}
-    .cta-band .hero-ctas{position:relative; justify-content:center;}
-
-    /* ============ FOOTER ============ */
-    footer{background:var(--ink); color:var(--on-dark-dim); padding:64px 0 28px; font-size:13.5px;}
-    .foot-grid{display:grid; grid-template-columns:1.4fr 1fr 1fr 1fr; gap:36px; padding-bottom:40px; border-bottom:1px solid var(--ink-line);}
-    .foot-brand p{margin-top:14px; max-width:32ch;}
-    .foot-col h4{font-family:var(--body); font-size:13px; color:var(--on-dark); margin-bottom:14px; font-weight:700;}
-    .foot-col li{padding:5px 0;}
-    .foot-col a:hover{color:var(--on-dark);}
-    .foot-bottom{display:flex; justify-content:space-between; align-items:center; padding-top:24px; flex-wrap:wrap; gap:10px;}
-
-    /* ============ RESPONSIVE ============ */
-    @media (max-width:960px){
-        .hero-grid{grid-template-columns:1fr;}
-        .hero-visual{height:380px; max-width:460px; margin:0 auto;}
-        .feat-grid{grid-template-columns:repeat(2,1fr);}
-        .how-steps{grid-template-columns:repeat(2,1fr); row-gap:34px;}
-        .how-steps::before{display:none;}
-        .price-grid{grid-template-columns:1fr; max-width:420px; margin:0 auto;}
-        .foot-grid{grid-template-columns:1fr 1fr;}
-    }
-    @media (max-width:720px){
-        .nav-links{
-            position:fixed; top:82px; left:16px; right:16px;
-            background:rgba(9,13,26,.97); border:1px solid rgba(255,255,255,.1);
-            border-radius:14px; padding:10px 6px; flex-direction:column; align-items:stretch; gap:0;
-            transform:translateY(-14px); opacity:0; visibility:hidden; pointer-events:none;
-            transition:all .25s ease;
-        }
-        .nav-links.open{transform:translateY(0); opacity:1; visibility:visible; pointer-events:auto;}
-        .nav-links a{padding:13px 14px; border-radius:8px;}
-        .nav-links a:hover{background:rgba(255,255,255,.06);}
-        .nav-actions .btn-ghost{display:none;}
-        .nav-toggle{display:flex;}
-        .feat-grid{grid-template-columns:1fr;}
-        .how-steps{grid-template-columns:1fr;}
-        .foot-grid{grid-template-columns:1fr; gap:26px;}
-        .cta-band{padding:40px 24px;}
-        section{padding:76px 0;}
-    }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZE-POS — Cloud Point of Sale for Restaurants & Cafés</title>
+  <meta name="description" content="ZE-POS is a cloud point-of-sale built for restaurants, cafés, and food counters. Sell fast, manage staff, run payroll, and grow — all from any device." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png" />
+  <link rel="stylesheet" href="landing/assets/css/style.css" />
 </head>
 <body>
+  <!-- ============ NAV ============ -->
+  <header class="nav" id="nav">
+    <div class="nav-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">Z</span>
+        <span class="brand-text">ZE<span class="brand-accent">·</span>POS</span>
+      </a>
+      <nav class="nav-links" id="navLinks">
+        <a href="index.html" class="active">Home</a>
+        <a href="features.html">Features</a>
+        <a href="contact.html">Contact</a>
+        <a href="login.html" class="btn btn-ghost nav-cta">Sign In</a>
+        <a href="register.html" class="btn btn-primary">Get Started</a>
+      </nav>
+      <button class="nav-toggle" id="navToggle" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
 
-<!-- ============ NAVBAR ============ -->
-<nav class="nav" id="siteNav">
-    <div class="wrap nav-inner">
-        <a href="#top" class="brand">
-            <span class="brand-mark">ZE</span>
-            ZE Payroll
-        </a>
-        <ul class="nav-links" id="navLinks">
-            <li><a href="#features">Features</a></li>
-            <li><a href="#explore">Live Demo</a></li>
-            <li><a href="#how-it-works">How It Works</a></li>
-            <li><a href="#pricing">Pricing</a></li>
-            <li><a href="#faq">FAQ</a></li>
+  <!-- ============ HERO ============ -->
+  <section class="hero">
+    <div class="hero-bg">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="orb orb-3"></div>
+      <div class="grid-lines"></div>
+    </div>
+    <div class="container hero-inner">
+      <div class="hero-copy">
+        <span class="pill reveal" data-reveal>
+          <span class="pulse-dot"></span> Cloud POS · No hardware lock-in · ₱499/mo
+        </span>
+        <h1 class="reveal" data-reveal data-delay="80">
+          Sell more. <span class="grad">Stress less.</span><br />Run your  business on ZE-POS.
+        </h1>
+        <p class="lead reveal" data-reveal data-delay="160">
+          A lightning-fast cloud point-of-sale built for restaurants, cafés, convenient stores and food counters.
+          Take orders, manage your menu, schedule staff, run payroll, and watch sales live — all from a tablet or phone.
+        </p>
+        <div class="hero-actions reveal" data-reveal data-delay="240">
+          <a href="contact.html" class="btn btn-primary btn-lg">Start Free Trial</a>
+          <a href="features.html" class="btn btn-ghost btn-lg">See How It Works →</a>
+        </div>
+        <div class="hero-stats reveal" data-reveal data-delay="320">
+          <div><strong>100+</strong><span>Active stores</span></div>
+          <div><strong>More</strong><span>Countries served</span></div>
+          <div><strong data-count="99">0</strong><span>% uptime</span></div>
+        </div>
+      </div>
+      <div class="hero-visual reveal" data-reveal data-delay="200">
+        <div class="mock mock-float">
+          <div class="mock-bar">
+            <span></span><span></span><span></span>
+          </div>
+          <div class="mock-pos">
+            <div class="mock-grid">
+              <div class="mock-item">🍔<b>Burger</b><i>₱120</i></div>
+              <div class="mock-item">🍕<b>Pizza</b><i>₱180</i></div>
+              <div class="mock-item">☕<b>Coffee</b><i>₱60</i></div>
+              <div class="mock-item">🍟<b>Fries</b><i>₱50</i></div>
+              <div class="mock-item">🥤<b>Soda</b><i>₱40</i></div>
+              <div class="mock-item">🍰<b>Cake</b><i>₱90</i></div>
+            </div>
+            <div class="mock-cart">
+              <div class="mock-cart-h">Order #1042</div>
+              <div class="mock-line"><span>Burger</span><b>₱120</b></div>
+              <div class="mock-line"><span>Coffee</span><b>₱60</b></div>
+              <div class="mock-total"><span>Total</span><b>₱180</b></div>
+              <div class="mock-pay">PAY</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="scroll-cue"><span></span></div>
+  </section>
+
+  <!-- ============ LOGOS ============ -->
+  <section class="logos">
+    <div class="container">
+      <p class="logos-label">Powering counters, kitchens & cafés of every size</p>
+      <div class="logos-row">
+        <span>🍔 Burger Joint</span>
+        <span>☕ Bean & Brew</span>
+        <span>🍕 Pizza Co.</span>
+        <span>🍜 Noodle Bar</span>
+        <span>🧋 Boba Stop</span>
+        <span>🥗 Fresh Bowl</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FEATURE GRID ============ -->
+  <section class="section" id="features">
+    <div class="container">
+      <div class="section-head reveal" data-reveal>
+        <span class="eyebrow">Everything in one place</span>
+        <h2>One system for the whole shop floor</h2>
+        <p>From the first order of the day to payroll at close — ZE-POS keeps it all in sync.</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feat reveal" data-reveal>
+          <div class="feat-icon">⚡</div>
+          <h3>Fast Touch POS</h3>
+          <p>Category tabs, search, sizes, add-ons, and kitchen notes. Complete orders in seconds on any screen.</p>
+        </article>
+        <article class="feat reveal" data-reveal data-delay="60">
+          <div class="feat-icon">📋</div>
+          <h3>Smart Menu</h3>
+          <p>Build categories, items with images, multiple sizes & prices, and paid condiments. Taxes auto-apply.</p>
+        </article>
+        <article class="feat reveal" data-reveal data-delay="120">
+          <div class="feat-icon">🍽</div>
+          <h3>Bundles & Combos</h3>
+          <p>Create meal deals with bundled pricing — burger + fries + drink for one price. Auto-expands to items in kitchen.</p>
+        </article>
+        <article class="feat reveal" data-reveal>
+          <div class="feat-icon">👥</div>
+          <h3>Staff & Shifts</h3>
+          <p>Invite cashiers by code, set weekly or overnight schedules, and block selling when no one's on shift.</p>
+        </article>
+        <article class="feat reveal" data-reveal data-delay="60">
+          <div class="feat-icon">📅</div>
+          <h3>Shift Schedules</h3>
+          <p>Recurring weekly schedules with overnight support. One-off shifts for holidays. Auto-closes when shift ends.</p>
+        </article>
+        <article class="feat reveal" data-reveal data-delay="120">
+          <div class="feat-icon">💰</div>
+          <h3>Cash & Drawers</h3>
+          <p>Track float-in, count-out, and shortage/overage per shift. Reconcile the till without the math.</p>
+        </article>
+        <article class="feat reveal" data-reveal>
+          <div class="feat-icon">🧾</div>
+          <h3>Payroll Built-In</h3>
+          <p>Turn clocked hours into payroll with overtime rules. Save runs, mark paid, export to CSV.</p>
+        </article>
+        <article class="feat reveal" data-reveal data-delay="60">
+          <div class="feat-icon">🏆</div>
+          <h3>Leaderboards</h3>
+          <p>Gamify sales with per-cashier leaderboards. Top seller, highest AOV, most orders — updated live.</p>
+        </article>
+        <article class="feat reveal" data-reveal data-delay="120">
+          <div class="feat-icon">📊</div>
+          <h3>Live Reports</h3>
+          <p>Revenue, AOV, tax, and per-cashier performance. 7-day charts and exportable sales history.</p>
+        </article>
+        <article class="feat reveal" data-reveal>
+          <div class="feat-icon">📦</div>
+          <h3>Stock & Inventory</h3>
+          <p>Track ingredients, set par levels, get low-stock alerts. Recipe costing shows true margin per item.</p>
+        </article>
+        <article class="feat reveal" data-reveal data-delay="60">
+          <div class="feat-icon">🏪</div>
+          <h3>Multi-Store</h3>
+          <p>Run multiple branches under one account. Separate menus, staff, and numbers per location.</p>
+        </article>
+        <article class="feat reveal" data-reveal data-delay="120">
+          <div class="feat-icon">📱</div>
+          <h3>Installable PWA</h3>
+          <p>Add ZE-POS to any tablet or phone. Works online, keeps selling with an offline outbox.</p>
+        </article>
+        <article class="feat reveal" data-reveal>
+          <div class="feat-icon">🖥</div>
+          <h3>Customer Display</h3>
+          <p>Second-screen facing the customer shows order, total, and change — no extra hardware needed.</p>
+        </article>
+        <article class="feat reveal" data-reveal data-delay="60">
+          <div class="feat-icon">🔒</div>
+          <h3>Secure by Design</h3>
+          <p>Row-level security, role gates, and a DB-enforced paywall. Your data stays yours and isolated.</p>
+        </article>
+        <article class="feat reveal" data-reveal data-delay="120">
+          <div class="feat-icon">💳</div>
+          <h3>Billing & Subscriptions</h3>
+          <p>Self-serve monthly billing via GCash, Maya, or bank. Admin dashboard for super-admins to manage workspaces.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ HOW IT WORKS ============ -->
+  <section class="section section-alt" id="how">
+    <div class="container">
+      <div class="section-head reveal" data-reveal>
+        <span class="eyebrow">Up and running in minutes</span>
+        <h2>How ZE-POS works</h2>
+      </div>
+      <div class="steps">
+        <div class="step reveal" data-reveal>
+          <div class="step-num">1</div>
+          <h3>Sign up & build your menu</h3>
+          <p>Create your business, drop in categories and items with photos and prices. A starter menu is ready on day one.</p>
+        </div>
+        <div class="step reveal" data-reveal data-delay="80">
+          <div class="step-num">2</div>
+          <h3>Invite your team</h3>
+          <p>Send cashiers a 7-day invite code. Set their schedules so the register only opens when they're on the floor.</p>
+        </div>
+        <div class="step reveal" data-reveal data-delay="160">
+          <div class="step-num">3</div>
+          <h3>Sell & track live</h3>
+          <p>Start a shift, take dine-in / takeaway / delivery orders, print receipts, and watch sales update in real time.</p>
+        </div>
+        <div class="step reveal" data-reveal data-delay="240">
+          <div class="step-num">4</div>
+          <h3>Close, pay & grow</h3>
+          <p>Reconcile the till, run payroll from clocked hours, and read reports to make smarter calls next week.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ INSIDE THE APP ============ -->
+  <section class="section" id="inside">
+    <div class="container">
+      <div class="section-head reveal" data-reveal>
+        <span class="eyebrow">Your command center</span>
+        <h2>Everything you need — one sidebar away</h2>
+        <p>Tap any item in the sidebar to see what it does. The ZE-POS app keeps every tool a click away — admins see the full suite, cashiers see just the register.</p>
+      </div>
+      <div class="inside-app reveal" data-reveal>
+        <div class="app-sidebar-demo">
+          <div class="sidebar-header">
+            <div class="sidebar-brand-icon"><img src="assets/logo.png" alt="ZE-POS logo"></div>
+            <div class="sidebar-brand-text">ZE<small>Point of Sale</small></div>
+          </div>
+          <nav class="sidebar-nav-demo" id="appSidebar">
+            <div class="sidebar-section">Main</div>
+            <a class="sidebar-link-demo active" data-feature="dashboard" data-tooltip="Dashboard — Today's revenue, orders, open shifts, 7-day chart">
+              <span class="icon">📊</span> Dashboard
+            </a>
+            <a class="sidebar-link-demo" data-feature="pos" data-tooltip="POS Screen — Category tabs, search, sizes, add-ons, kitchen notes">
+              <span class="icon">🛒</span> POS Screen
+            </a>
+
+            <div class="sidebar-section">Management</div>
+            <a class="sidebar-link-demo" data-feature="staff" data-tooltip="Staff — Invite cashiers, set roles, manage access">
+              <span class="icon">👥</span> Staff
+            </a>
+            <a class="sidebar-link-demo" data-feature="categories" data-tooltip="Categories — Organize your menu into searchable tabs">
+              <span class="icon">📁</span> Categories
+            </a>
+            <a class="sidebar-link-demo" data-feature="menu" data-tooltip="Menu Items — Images, descriptions, multiple sizes, kitchen notes">
+              <span class="icon">📋</span> Menu Items
+            </a>
+            <a class="sidebar-link-demo" data-feature="bundles" data-tooltip="Bundles / Combos — Meal deals that auto-expand in kitchen">
+              <span class="icon">🍽</span> Bundles & Combos
+            </a>
+            <a class="sidebar-link-demo" data-feature="condiments" data-tooltip="Condiments — Paid add-ons (Extra Cheese) and free mods (Less Ice)">
+              <span class="icon">🧀</span> Condiments
+            </a>
+            <a class="sidebar-link-demo" data-feature="tax" data-tooltip="Tax Setup — One rate, auto-applied, with live preview">
+              <span class="icon">💰</span> Tax Setup
+            </a>
+            <a class="sidebar-link-demo" data-feature="stock" data-tooltip="Stock & Inventory — Ingredients, par levels, low-stock alerts, recipe costing">
+              <span class="icon">📦</span> Stock & Inventory
+            </a>
+            <a class="sidebar-link-demo" data-feature="schedules" data-tooltip="Shift Schedules — Weekly recurring, overnight, one-off holidays">
+              <span class="icon">📅</span> Shift Schedules
+            </a>
+
+            <div class="sidebar-section">Reports</div>
+            <a class="sidebar-link-demo" data-feature="orders" data-tooltip="Order History — Every transaction, searchable and exportable">
+              <span class="icon">📑</span> Order History
+            </a>
+            <a class="sidebar-link-demo" data-feature="reports" data-tooltip="Sales Reports — Daily, monthly, custom range, per-cashier">
+              <span class="icon">📈</span> Sales Reports
+            </a>
+            <a class="sidebar-link-demo" data-feature="shifts" data-tooltip="Shifts — Float-in, count-out, shortage/overage per shift">
+              <span class="icon">🕐</span> Shifts
+            </a>
+            <a class="sidebar-link-demo" data-feature="payroll" data-tooltip="Payroll — Clocked hours → payslips with overtime rules">
+              <span class="icon">💰</span> Payroll
+            </a>
+            <a class="sidebar-link-demo" data-feature="leaderboards" data-tooltip="Leaderboards — Top seller, highest AOV, most orders, live">
+              <span class="icon">🏆</span> Leaderboards
+            </a>
+            <a class="sidebar-link-demo" data-feature="multistore" data-tooltip="Multi-Store Reports — Consolidated view across all branches">
+              <span class="icon">🏪</span> Multi-Store Reports
+            </a>
+
+            <div class="sidebar-section">System</div>
+            <a class="sidebar-link-demo" data-feature="settings" data-tooltip="Settings — Business info, receipt footer, timezone, currency">
+              <span class="icon">⚙️</span> Settings
+            </a>
+
+            <div class="sidebar-section">Account</div>
+            <a class="sidebar-link-demo" data-feature="billing" data-tooltip="Billing — Monthly subscription, GCash/Maya/bank, self-serve">
+              <span class="icon">💳</span> Billing & Subscription
+            </a>
+          </nav>
+        </div>
+
+        <!-- Content panels -->
+        <div class="app-content-demo" id="appContent">
+
+          <!-- Dashboard -->
+          <div class="feature-panel active" data-panel="dashboard">
+            <div class="content-header">
+              <h3>📊 Dashboard</h3>
+              <p class="muted">Your real-time pulse on the business</p>
+            </div>
+            <div class="content-kpis">
+              <div class="kpi"><b>₱48,210</b><span>Revenue Today</span></div>
+              <div class="kpi"><b>312</b><span>Orders</span></div>
+              <div class="kpi"><b>₱154</b><span>Avg Order Value</span></div>
+              <div class="kpi"><b>₱4,380</b><span>Tax Collected</span></div>
+            </div>
+            <div class="content-chart">
+              <div class="chart-bars">
+                <div class="bar" style="height: 35%"></div>
+                <div class="bar" style="height: 58%"></div>
+                <div class="bar" style="height: 52%"></div>
+                <div class="bar" style="height: 72%"></div>
+                <div class="bar" style="height: 65%"></div>
+                <div class="bar" style="height: 88%"></div>
+                <div class="bar" style="height: 80%"></div>
+              </div>
+              <div class="chart-axis"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+            </div>
+            <div class="content-footer">
+              <span class="pill-sm">🟢 Live data</span>
+              <span class="pill-sm">📱 PWA ready</span>
+              <span class="pill-sm">🏪 Multi-store</span>
+            </div>
+          </div>
+
+          <!-- POS Screen -->
+          <div class="feature-panel" data-panel="pos">
+            <div class="content-header">
+              <h3>🛒 POS Screen</h3>
+              <p class="muted">The register your cashiers live in</p>
+            </div>
+            <div class="mini-pos" style="border:1px solid var(--line);">
+              <div class="mini-tabs">
+                <span class="active">All</span><span>Mains</span><span>Drinks</span><span>Dessert</span>
+              </div>
+              <div class="mini-grid">
+                <div class="mini-card"><span>🍔</span><b>Cheeseburger</b><i>₱120</i></div>
+                <div class="mini-card"><span>🍕</span><b>Pepperoni</b><i>₱180</i></div>
+                <div class="mini-card"><span>🍗</span><b>Chicken</b><i>₱150</i></div>
+                <div class="mini-card"><span>🥤</span><b>Iced Tea</b><i>₱40</i></div>
+              </div>
+              <div class="mini-cart">
+                <div class="mini-line"><span>Cheeseburger ×1</span><b>₱120</b></div>
+                <div class="mini-line"><span>+ Extra Cheese</span><b>₱20</b></div>
+                <div class="mini-foot"><span>Total</span><b>₱140</b></div>
+              </div>
+            </div>
+            <div class="content-footer">
+              <span class="pill-sm">⚡ Tap to add</span>
+              <span class="pill-sm">🔍 Live search</span>
+              <span class="pill-sm">🧾 Auto receipt</span>
+            </div>
+          </div>
+
+          <!-- Staff -->
+          <div class="feature-panel" data-panel="staff">
+            <div class="content-header">
+              <h3>👥 Staff</h3>
+              <p class="muted">Invite, assign roles, manage access</p>
+            </div>
+            <div class="demo-staff" style="padding:18px;background:var(--card-2);border-radius:14px;">
+              <div class="demo-sched">
+                <div class="ds-row"><span>👤</span><b>Lounel S.</b><i>Admin · ls@shop.com</i></div>
+                <div class="ds-row"><span>👤</span><b>Tiza</b><i>Cashier · tz@shop.com</i></div>
+                <div class="ds-row"><span>👤</span><b>Eian.</b><i>Cashier · eian@shop.com</i></div>
+              </div>
+              <div class="demo-invite">
+                <span>Invite sent</span>
+                <code>ZE-JOIN-7F3K9Q</code>
+                <small>expires in 7 days</small>
+              </div>
+            </div>
+            <div class="content-footer">
+              <span class="pill-sm">🔐 Role-based</span>
+              <span class="pill-sm">📧 7-day codes</span>
+              <span class="pill-sm">🏪 Store assignment</span>
+            </div>
+          </div>
+
+          <!-- Categories -->
+          <div class="feature-panel" data-panel="categories">
+            <div class="content-header">
+              <h3>📁 Categories</h3>
+              <p class="muted">Organize your menu into searchable tabs</p>
+            </div>
+            <div class="demo-menu-cats" style="margin-bottom:16px;">
+              <span class="active">Mains</span><span>Sides</span><span>Drinks</span><span>Desserts</span><span>Promos</span>
+            </div>
+            <div class="demo-menu" style="padding:0;background:transparent;">
+              <div class="demo-menu-item">
+                <div class="dmi-img">🍔</div>
+                <div class="dmi-body">
+                  <b>Mains · 24 items</b>
+                  <p>Burgers, pizza, pasta, rice meals — tap to filter the register.</p>
+                </div>
+              </div>
+            </div>
+            <div class="content-footer">
+              <span class="pill-sm">🔎 Searchable</span>
+              <span class="pill-sm">⚡ One-tap filter</span>
+              <span class="pill-sm">🙈 Enable / disable</span>
+            </div>
+          </div>
+
+          <!-- Menu Items -->
+          <div class="feature-panel" data-panel="menu">
+            <div class="content-header">
+              <h3>📋 Menu Items</h3>
+              <p class="muted">Images, sizes, prices, kitchen notes</p>
+            </div>
+            <div class="demo-menu" style="padding:0;background:transparent;">
+              <div class="demo-menu-item">
+                <div class="dmi-img">🍔</div>
+                <div class="dmi-body">
+                  <b>Classic Cheeseburger</b>
+                  <p>Beef patty, cheddar, lettuce, tomato. <em>Note: "no onions" supported.</em></p>
+                  <div class="dmi-sizes">
+                    <span class="active">Solo ₱120</span><span>Combo ₱180</span><span>Family ₱320</span>
+                  </div>
+                </div>
+              </div>
+              <div class="demo-menu-item">
+                <div class="dmi-img">🥤</div>
+                <div class="dmi-body">
+                  <b>Iced Americano</b>
+                  <p>Cold brew over ice.</p>
+                  <div class="dmi-sizes"><span class="active">Regular ₱60</span><span>Large ₱80</span></div>
+                </div>
+              </div>
+              <div class="demo-condiments">
+                <span>+ Extra Shot ₱20</span><span>+ Oat Milk ₱15</span><span>+ Less Ice</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bundles -->
+          <div class="feature-panel" data-panel="bundles">
+            <div class="content-header">
+              <h3>🍽 Bundles & Combos</h3>
+              <p class="muted">Meal deals that auto-expand in the kitchen</p>
+            </div>
+            <div class="demo-menu" style="padding:0;background:transparent;">
+              <div class="demo-menu-item">
+                <div class="dmi-img">🍔</div>
+                <div class="dmi-body">
+                  <b>Burger Combo</b>
+                  <p>Cheeseburger + Regular Fries + Iced Tea. <em>Saves ₱30 vs à la carte.</em></p>
+                  <div class="dmi-sizes"><span class="active">Solo ₱210</span><span>Large Drink ₱230</span></div>
+                </div>
+              </div>
+              <div class="demo-condiments">
+                <span>📦 Kitchen receives: Burger, Fries, Tea</span>
+              </div>
+            </div>
+            <div class="content-footer">
+              <span class="pill-sm">💸 Auto-discount</span>
+              <span class="pill-sm">🍳 Splits to items</span>
+            </div>
+          </div>
+
+          <!-- Condiments -->
+          <div class="feature-panel" data-panel="condiments">
+            <div class="content-header">
+              <h3>🧀 Condiments</h3>
+              <p class="muted">Paid add-ons and free kitchen mods</p>
+            </div>
+            <div class="demo-condiments" style="margin:0 0 16px;justify-content:flex-start;">
+              <span>+ Extra Cheese ₱20</span><span>+ Bacon ₱30</span><span>+ Less Ice</span><span>+ No Onions</span>
+            </div>
+            <div class="demo-menu" style="padding:0;background:transparent;">
+              <div class="demo-menu-item">
+                <div class="dmi-img">🧀</div>
+                <div class="dmi-body">
+                  <b>Global condiments</b>
+                  <p>Set once, apply to any item. Paid add-ons add to the total; free mods print as kitchen notes.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tax Setup -->
+          <div class="feature-panel" data-panel="tax">
+            <div class="content-header">
+              <h3>💰 Tax Setup</h3>
+              <p class="muted">One rate, auto-applied, with live preview</p>
+            </div>
+            <div class="demo-staff" style="padding:18px;background:var(--card-2);border-radius:14px;">
+              <div class="ds-row"><span>🏷</span><b>Tax Name</b><i>VAT (12%)</i></div>
+              <div class="ds-row"><span>%</span><b>Rate</b><i>12.0%</i></div>
+              <div class="ds-row"><span>🧾</span><b>Preview</b><i>₱100 → ₱112.00</i></div>
+            </div>
+            <div class="content-footer">
+              <span class="pill-sm">✅ Auto-applied</span>
+              <span class="pill-sm">👁 Live preview</span>
+            </div>
+          </div>
+
+          <!-- Stock -->
+          <div class="feature-panel" data-panel="stock">
+            <div class="content-header">
+              <h3>📦 Stock & Inventory</h3>
+              <p class="muted">Ingredients, par levels, recipe costing</p>
+            </div>
+            <div class="demo-staff" style="padding:18px;background:var(--card-2);border-radius:14px;">
+              <div class="demo-shift-bar" style="background: rgba(99,102,241,.12); border-color: rgba(99,102,241,.3); color: var(--indigo-300);margin-bottom:12px;">
+                <span style="width:8px;height:8px;border-radius:50%;background:var(--indigo-400)"></span> 4 items low · 1 out
+              </div>
+              <div class="demo-sched">
+                <div class="ds-row"><span>🥩</span><b>Beef Patty</b><i>2.3 kg · Par: 5 kg</i></div>
+                <div class="ds-row"><span>🥛</span><b>Oat Milk</b><i>0 L · OUT OF STOCK</i></div>
+              </div>
+              <div class="demo-invite">
+                <span>Recipe: Cheeseburger</span>
+                <code>Beef 150g + Cheese 20g + Bun 1pc = ₱42 cost (65% margin)</code>
+              </div>
+            </div>
+          </div>
+
+          <!-- Schedules -->
+          <div class="feature-panel" data-panel="schedules">
+            <div class="content-header">
+              <h3>📅 Shift Schedules</h3>
+              <p class="muted">Recurring, overnight, one-off holidays</p>
+            </div>
+            <div class="demo-staff" style="padding:18px;background:var(--card-2);border-radius:14px;">
+              <div class="demo-sched">
+                <div class="ds-row"><span>Mon</span><b>09:00–17:00</b><i>Mara</i></div>
+                <div class="ds-row"><span>Tue</span><b>17:00–01:00</b><i>Joel</i></div>
+                <div class="ds-row overnight"><span>Thu</span><b>22:00–06:00</b><i>Tin</i></div>
+                <div class="ds-row"><span>Sun</span><b>10:00–20:00</b><i>Mara</i></div>
+              </div>
+              <div class="demo-invite">
+                <span>Holiday override</span>
+                <code>Dec 25 · 10:00–16:00 · Mara</code>
+                <small>one-off</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Order History -->
+          <div class="feature-panel" data-panel="orders">
+            <div class="content-header">
+              <h3>📑 Order History</h3>
+              <p class="muted">Every transaction, searchable & exportable</p>
+            </div>
+            <div class="demo-staff" style="padding:18px;background:var(--card-2);border-radius:14px;">
+              <div class="demo-sched">
+                <div class="ds-row"><span>#1042</span><b>Dine-In</b><i>₱180 · 2 items</i></div>
+                <div class="ds-row"><span>#1041</span><b>Takeaway</b><i>₱240 · 3 items</i></div>
+                <div class="ds-row"><span>#1040</span><b>Delivery</b><i>₱95 · 1 item</i></div>
+              </div>
+              <div class="demo-invite">
+                <span>🔍 Search by #, type, or cashier</span>
+                <small>export to CSV</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sales Reports -->
+          <div class="feature-panel" data-panel="reports">
+            <div class="content-header">
+              <h3>📈 Sales Reports</h3>
+              <p class="muted">Daily, monthly, custom range, per-cashier</p>
+            </div>
+            <div class="dr-kpis" style="margin-bottom:16px;">
+              <div><b>₱48,210</b><span>Revenue</span></div>
+              <div><b>312</b><span>Orders</span></div>
+              <div><b>₱154</b><span>AOV</span></div>
+              <div><b>₱4,380</b><span>Tax</span></div>
+            </div>
+            <div class="dr-chart">
+              <div class="bar" style="height:40%"></div>
+              <div class="bar" style="height:62%"></div>
+              <div class="bar" style="height:55%"></div>
+              <div class="bar" style="height:78%"></div>
+              <div class="bar" style="height:70%"></div>
+              <div class="bar" style="height:92%"></div>
+              <div class="bar" style="height:84%"></div>
+            </div>
+            <div class="dr-axis"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+          </div>
+
+          <!-- Shifts -->
+          <div class="feature-panel" data-panel="shifts">
+            <div class="content-header">
+              <h3>🕐 Shifts</h3>
+              <p class="muted">Float-in, count-out, shortage/overage</p>
+            </div>
+            <div class="demo-staff" style="padding:18px;background:var(--card-2);border-radius:14px;">
+              <div class="demo-shift-bar">
+                <span class="dot-open"></span> Shift open · 23 orders · ₱4,180 sold
+              </div>
+              <div class="demo-sched">
+                <div class="ds-row"><span>💵</span><b>Float In</b><i>₱2,000</i></div>
+                <div class="ds-row"><span>🧮</span><b>Count Out</b><i>₱6,180</i></div>
+                <div class="ds-row overnight"><span>⚠️</span><b>Variance</b><i>+₱20 overage</i></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Payroll -->
+          <div class="feature-panel" data-panel="payroll">
+            <div class="content-header">
+              <h3>💰 Payroll</h3>
+              <p class="muted">Clocked hours → payslips with overtime</p>
+            </div>
+            <div class="demo-payroll" style="padding:18px;background:var(--card-2);border-radius:14px;">
+              <div class="dp-head">Payroll · This Month</div>
+              <div class="dp-row"><span>Tiza</span><b>₱9,600</b><i>160h</i></div>
+              <div class="dp-row"><span>Eian</span><b>₱7,420</b><i>120h · 8h OT</i></div>
+              <div class="dp-row"><span>Lounel S</span><b>₱5,200</b><i>80h</i></div>
+              <div class="dp-total"><span>Total labor</span><b>₱22,220</b></div>
+              <div class="dp-actions"><button class="btn btn-primary btn-sm">Save run</button><button class="btn btn-ghost btn-sm">Export CSV</button></div>
+            </div>
+          </div>
+
+          <!-- Leaderboards -->
+          <div class="feature-panel" data-panel="leaderboards">
+            <div class="content-header">
+              <h3>🏆 Leaderboards</h3>
+              <p class="muted">Gamify your floor — live rankings</p>
+            </div>
+            <div class="demo-payroll" style="padding:18px;background:var(--card-2);border-radius:14px;">
+              <div class="dp-head">Leaderboards · This Week</div>
+              <div class="dp-row"><span>🥇Tiza</span><b>₱24,500</b><i>142 orders</i></div>
+              <div class="dp-row"><span>🥈 Eian</span><b>₱18,200</b><i>128 orders</i></div>
+              <div class="dp-row"><span>🥉 Lounel S</span><b>₱12,100</b><i>95 orders</i></div>
+              <div class="dp-total"><span>Top AOV</span><b>Mara — ₱172</b></div>
+            </div>
+          </div>
+
+          <!-- Multi-Store -->
+          <div class="feature-panel" data-panel="multistore">
+            <div class="content-header">
+              <h3>🏪 Multi-Store Reports</h3>
+              <p class="muted">Consolidated view across all branches</p>
+            </div>
+            <div class="demo-store" style="padding:18px;background:var(--card-2);border-radius:14px;">
+              <div class="ds-switch">
+                <span class="active">🏪 All Stores</span><span>🏪 Manila</span><span>🏪 Cebu</span><span>🏪 Davao</span>
+              </div>
+              <div class="ds-panel">
+                <div class="ds-stat"><b>₱37,530</b><span>Total Revenue</span></div>
+                <div class="ds-stat"><b>300</b><span>Total Orders</span></div>
+                <div class="ds-stat"><b>10</b><span>Staff on shift</span></div>
+                <div class="ds-stat"><b>202</b><span>Menu items</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Settings -->
+          <div class="feature-panel" data-panel="settings">
+            <div class="content-header">
+              <h3>⚙️ Settings</h3>
+              <p class="muted">Business info, receipt footer, locale</p>
+            </div>
+            <div class="demo-staff" style="padding:18px;background:var(--card-2);border-radius:14px;">
+              <div class="demo-sched">
+                <div class="ds-row"><span>🏢</span><b>Business Name</b><i>Burger Joint Makati</i></div>
+                <div class="ds-row"><span>📍</span><b>Address</b><i>123 Ayala Ave, Makati</i></div>
+                <div class="ds-row"><span>🌍</span><b>Timezone</b><i>Asia/Manila (UTC+8)</i></div>
+                <div class="ds-row"><span>💱</span><b>Currency</b><i>PHP (₱)</i></div>
+              </div>
+              <div class="demo-invite">
+                <span>Receipt Footer</span>
+                <code>"Thank you! Follow us @burgerjointph"</code>
+              </div>
+            </div>
+          </div>
+
+          <!-- Billing -->
+          <div class="feature-panel" data-panel="billing">
+            <div class="content-header">
+              <h3>💳 Billing & Subscription</h3>
+              <p class="muted">Self-serve monthly — GCash, Maya, bank</p>
+            </div>
+            <div class="demo-staff" style="padding:18px;background:var(--card-2);border-radius:14px;">
+              <div class="demo-shift-bar" style="background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.3); color: #fcd34d;">
+                <span style="width:8px;height:8px;border-radius:50%;background:var(--warn)"></span> Active · Renews Jan 15, 2026 · ₱499/mo
+              </div>
+              <div class="demo-sched">
+                <div class="ds-row"><span>💳</span><b>Plan</b><i>ZE-POS Monthly</i></div>
+                <div class="ds-row"><span>📄</span><b>Last invoice</b><i>Dec 15, 2025 · ₱499</i></div>
+                <div class="ds-row"><span>💰</span><b>Method</b><i>GCash · 09XX XXX XXXX</i></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SHOWCASE / DEMO STRIP ============ -->
+  <section class="section">
+    <div class="container showcase">
+      <div class="showcase-copy reveal" data-reveal>
+        <span class="eyebrow">Take a peek inside</span>
+        <h2>See the register your team will actually enjoy using</h2>
+        <p>Big buttons, instant search, and a cart that keeps up with a lunch rush. Customize every item with sizes and add-ons — then print a receipt your customer can read.</p>
+        <a href="features.html" class="btn btn-primary">Explore the full tour →</a>
+      </div>
+      <div class="showcase-visual reveal" data-reveal data-delay="120">
+        <div class="mini-pos">
+          <div class="mini-tabs">
+            <span class="active">All</span><span>Mains</span><span>Drinks</span><span>Dessert</span>
+          </div>
+          <div class="mini-grid">
+            <div class="mini-card"><span>🍔</span><b>Cheeseburger</b><i>₱120</i></div>
+            <div class="mini-card"><span>🍕</span><b>Pepperoni</b><i>₱180</i></div>
+            <div class="mini-card"><span>🍗</span><b>Chicken</b><i>₱150</i></div>
+            <div class="mini-card"><span>🥤</span><b>Iced Tea</b><i>₱40</i></div>
+          </div>
+          <div class="mini-cart">
+            <div class="mini-line"><span>Cheeseburger ×1</span><b>₱120</b></div>
+            <div class="mini-line"><span>+ Extra Cheese</span><b>₱20</b></div>
+            <div class="mini-foot"><span>Total</span><b>₱140</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PRICING ============ -->
+  <section class="section section-alt" id="pricing">
+    <div class="container">
+      <div class="section-head reveal" data-reveal>
+        <span class="eyebrow">Simple pricing</span>
+        <h2>Choose plan. Every feature. No surprises.</h2>
+        <p>Pay monthly with GCash, Maya, or bank transfer. Cancel anytime from your billing page.</p>
+      </div>
+
+<!-- ADD THIS NEW WRAPPER DIV -->
+     <div class="pricing-grid" style="display: flex !important; flex-direction: row !important; justify-content: center !important; gap: 24px !important; margin-top: 40px !important;">
+
+        
+   <div class="pricing-card reveal" data-reveal>
+        <div class="price-tag">Trial</div>
+        <h3>ZE-POS Monthly- TRIAL </h3>
+        <div class="price"><span class="cur">₱</span><span class="amt">0</span><span class="per">/1Day</span></div>
+        <ul class="price-list">
+          <li>✓ Unlimited orders & products</li>
+          <li>✓ Multi-store support</li>
+          <li>✓ Staff, shifts & payroll</li>
+          <li>✓ Live reports & receipts</li>
+          <li>✓ Installable PWA</li>
+          <li>✓ Email support</li>
         </ul>
-        <div class="nav-actions">
-            <a href="app.html" class="btn btn-ghost">Login</a>
-            <a href="register.html?plan=trial" class="btn btn-lime">Start Free Trial</a>
-            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu" aria-expanded="false">
-                <i class="fas fa-bars"></i>
-            </button>
+        <a href="register.html" class="btn btn-primary btn-lg">Start Free Trial</a>
+        <p class="price-note">No card required to try. Pay when you're ready.</p>
+      </div>
+
+<!-- CARD 3: 499 (POP-OUT FEATURED CARD WITH INLINE STYLES) -->
+        <div class="pricing-card reveal" data-reveal style="flex: 1 1 300px; max-width: 350px; transform: scale(1.08); border: 2px solid #6366f1; box-shadow: 0 15px 35px rgba(99, 102, 241, 0.35); z-index: 2; position: relative; background: var(--card);">
+          
+          <!-- HOT TAG WITH INLINE STYLES -->
+          <div class="price-tag" style="background: linear-gradient(135deg, #ff416c, #ff4b2b); color: #ffffff; font-weight: 700; font-size: 0.85rem; padding: 6px 14px; border-radius: 20px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(255, 75, 43, 0.4); text-transform: uppercase; letter-spacing: 0.5px; border: none;">
+            🔥 Most Popular
+          </div>
+          
+          <h3>ZE-POS Monthly</h3>
+          <div class="price"><span class="cur">₱</span><span class="amt">499</span><span class="per">/mo</span></div>
+          <ul class="price-list">
+            <li>✓ Unlimited orders & products</li>
+            <li>✓ Staff, shifts & payroll</li>
+            <li>✓ Multi-store support</li>
+            <li>✓ Live reports & receipts</li>
+            <li>✓ Installable PWA</li>
+            <li>✓ Email support</li>
+          </ul>
+          
+          <!-- BUTTON WITH INLINE STYLES -->
+          <a href="register.html" class="btn btn-primary btn-lg" style="background: linear-gradient(135deg, #6366f1, #4f46e5); box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4); color: #ffffff; border: none;">Subscribe Now!!!</a>
+          
+          <p class="price-note">No card required to try. Pay when you're ready.</p>
         </div>
-    </div>
-</nav>
 
-<!-- ============ HERO ============ -->
-<header class="hero" id="top">
-    <div class="wrap hero-grid">
-        <div>
-            <div class="eyebrow-pill"><span class="dot"></span> Built for Philippine payroll rules</div>
-            <h1>Your team clocks in. Payroll takes it from there.</h1>
-            <p class="lead">ZE Payroll turns QR time-ins and DTRs straight into ready-to-send payslips — overtime, late deductions, SSS, PhilHealth, and Pag-IBIG computed automatically, every cutoff.</p>
-            <div class="hero-ctas">
-                <a href="register.html?plan=trial" class="btn btn-lime btn-lg">Start Free Trial</a>
-                <a href="app.html" class="btn btn-ghost btn-lg">Login</a>
-            </div>
-            <p class="hero-note">5 days free · no card required · switch plans anytime</p>
-            <div class="hero-stats">
-                <div class="hero-stat"><b>3</b><span>Ways to clock in</span></div>
-                <div class="hero-stat"><b>100%</b><span>Automatic OT & Sunday rules</span></div>
-                <div class="hero-stat"><b>&lt; 5 min</b><span>To run a full cutoff</span></div>
-            </div>
-        </div>
 
-        <div class="hero-visual" aria-hidden="true">
-            <div class="float-card payslip-card">
-                <div class="payslip-head">
-                    <div>
-                        <b>Payslip — Sep 16–30</b>
-                        <span>Maria Santos · Cashier</span>
-                    </div>
-                    <span class="payslip-badge">Ready</span>
-                </div>
-                <div class="payslip-row"><span>Basic Pay (10 days)</span><span>₱5,000.00</span></div>
-                <div class="payslip-row"><span>Overtime (incl. Sunday)</span><span>₱875.00</span></div>
-                <div class="payslip-row"><span>SSS / PhilHealth / Pag-IBIG</span><span>-₱312.50</span></div>
-                <div class="payslip-net">
-                    <span>Net Pay</span>
-                    <b id="netPayCounter">₱0.00</b>
-                </div>
-            </div>
-            <div class="float-card scan-toast">
-                <i class="fas fa-circle-check fa-lg"></i>
-                <div>
-                    <b>Time In recorded</b>
-                    <span>8:02 AM · QR scan</span>
-                </div>
-            </div>
-            <div class="float-card qr-card">
-                <div class="qr-box"></div>
-                <p>Scan to clock in</p>
-                <small>No app install needed</small>
-            </div>
-        </div>
-    </div>
-</header>
 
-<!-- ============ FEATURES ============ -->
-<section id="features">
-    <div class="wrap">
-        <div class="section-head">
-            <div class="kicker">What's inside</div>
-            <h2>Everything payday actually needs.</h2>
-            <p>One system covers attendance, computation, and payslips — replace it or plug it into whatever you're already using.</p>
-        </div>
-        <div class="feat-grid">
+      
+   <div class="pricing-card reveal" data-reveal>
+        <div class="price-tag">Regular</div>
+        <h3>ZE-POS Monthly</h3>
+        <div class="price"><span class="cur">₱</span><span class="amt">299</span><span class="per">/mo</span></div>
+        <ul class="price-list">
+          <li>✓ Unlimited orders & products</li>
+          <li>✓ Staff, shifts & payroll</li>
+          <li>✓ Live reports & receipts</li>
+          <li>✓ Installable PWA</li>
+          <li>✓ Email support</li>
+        </ul>
+        <a href="register.html" class="btn btn-primary btn-lg">Subcribe Now!!!</a>
+        <p class="price-note">No card required to try. Pay when you're ready.</p>
+      </div>
 
-            <div class="feat-card">
-                <div class="feat-visual">
-                    <img src="screenshot/dashboard.png" alt="ZE Payroll dashboard showing total employees, present today, late today, total payroll, recent DTR entries, and a weekly attendance chart" loading="lazy">
-                </div>
-                <div class="feat-body">
-                    <h3>Live dashboard</h3>
-                    <p>Headcount, today's attendance, and this period's payroll total at a glance — no exporting to check.</p>
-                </div>
-            </div>
 
-            <div class="feat-card">
-                <div class="feat-visual">
-                    <img src="screenshot/employees.png" alt="ZE Payroll employee list showing ID, photo, name, position, daily rate, hourly rate, and status" loading="lazy">
-                </div>
-                <div class="feat-body">
-                    <h3>Employee records</h3>
-                    <p>Rates, schedules, and status in one place — daily or hourly rate, per employee, changeable anytime.</p>
-                </div>
-            </div>
 
-            <div class="feat-card">
-                <div class="feat-visual">
-                    <img src="screenshot/dtr.png" alt="ZE Payroll Daily Time Record table showing time in, time out, total hours, OT hours, late minutes, and status per employee" loading="lazy">
-                </div>
-                <div class="feat-body">
-                    <h3>Daily time record</h3>
-                    <p>Paste a whole cutoff at once, or log days one by one. Sundays can pay OT-only automatically — no base rate.</p>
-                </div>
-            </div>
 
-            <div class="feat-card">
-                <!-- swap for real screenshot: QR scanner kiosk -->
-                <div class="feat-visual">
-                    <div class="mock-qr">
-                        <div class="mock-qr-box"></div>
-                        <div class="mock-qr-pill"><i class="fas fa-check"></i> Time Out · 6:04 PM</div>
-                    </div>
-                </div>
-                <div class="feat-body">
-                    <h3>QR time clock</h3>
-                    <p>Each employee gets a personal QR code. Scan in, scan out — attendance logs itself, typo-free.</p>
-                </div>
-            </div>
 
-            <div class="feat-card">
-                <div class="feat-visual">
-                    <img src="screenshot/payroll.png" alt="ZE Payroll payroll processing table showing days worked, total hours, regular pay, OT pay, late deduction, deductions, and net pay per employee" loading="lazy">
-                </div>
-                <div class="feat-body">
-                    <h3>Automated payroll</h3>
-                    <p>OT, lateness, and SSS/PhilHealth/Pag-IBIG all computed the moment attendance is in — nothing to re-key.</p>
-                </div>
-            </div>
 
-            <div class="feat-card">
-                <div class="feat-visual">
-                    <img src="screenshot/geofencing.png" alt="ZE Payroll Attendance Security settings showing geofencing enforcement, office coordinates, and allowed radius" loading="lazy">
-                </div>
-                <div class="feat-body">
-                    <h3>Geofenced attendance</h3>
-                    <p>Lock QR clock-ins to the office itself — set your coordinates and radius, and it's enforced server-side, not just in the browser.</p>
-                </div>
-            </div>
-
+      
+   
 
         </div>
     </div>
-</section>
+  </section>
 
-<!-- ============ HOW IT WORKS ============ -->
-<section id="how-it-works" class="how-wrap">
-    <div class="wrap">
-        <div class="section-head">
-            <div class="kicker">How it works</div>
-            <h2>From time-in to payslip in four steps.</h2>
-            <p>Set it up once per employee; every cutoff after that runs itself.</p>
-        </div>
-        <div class="how-steps">
-            <div class="how-step">
-                <div class="how-num">1</div>
-                <h3>Add your team</h3>
-                <p>Set each employee's rate and schedule once — daily, hourly, whatever fits.</p>
-            </div>
-            <div class="how-step">
-                <div class="how-num">2</div>
-                <h3>Track attendance</h3>
-                <p>QR scan, kiosk, or manual DTR entry — pick whatever suits each shift.</p>
-            </div>
-            <div class="how-step">
-                <div class="how-num">3</div>
-                <h3>Payroll computes itself</h3>
-                <p>OT, late deductions, Sunday rules, and statutory contributions — all automatic.</p>
-            </div>
-            <div class="how-step">
-                <div class="how-num">4</div>
-                <h3>Send payslips</h3>
-                <p>Generate the period's payslips and hand them out. Done before lunch.</p>
-            </div>
-        </div>
+  <!-- ============ TESTIMONIALS ============ -->
+  <section class="section">
+    <div class="container">
+      <div class="section-head reveal" data-reveal>
+        <span class="eyebrow">Loved by owners</span>
+        <h2>What food-business owners say</h2>
+      </div>
+      <div class="quotes">
+        <blockquote class="quote reveal" data-reveal>
+          <p>"We switched from a cash book to ZE-POS in an afternoon. My cashiers picked it up instantly."</p>
+          <footer><b>Mara L.</b> — Café owner, Cebu</footer>
+        </blockquote>
+        <blockquote class="quote reveal" data-reveal data-delay="80">
+          <p>"Payroll used to eat my Sundays. Now I close the shift and it's done. Game changer."</p>
+          <footer><b>Joel R.</b> — Restaurant owner, Manila</footer>
+        </blockquote>
+        <blockquote class="quote reveal" data-reveal data-delay="160">
+          <p>"Two branches, one account, separate numbers. Exactly what I needed as we grew."</p>
+          <footer><b>Tin V.</b> — Food hall operator, Davao</footer>
+        </blockquote>
+      </div>
     </div>
-</section>
+  </section>
 
-<!-- ============ EXPLORE / COMMAND CENTER DEMO ============ -->
-<section id="explore" class="explore-wrap">
-    <div class="wrap">
-        <div class="section-head on-dark">
-            <div class="kicker">Take a look inside</div>
-            <h2>Click around. This is the actual app.</h2>
-            <p>No sign-up needed — tap any item in the sidebar to preview what your team and your payday will actually look like.</p>
-        </div>
-
-        <div class="demo-shell">
-            <!-- Sidebar -->
-            <nav class="demo-sidebar">
-                <div class="demo-brand"><span class="brand-mark">ZE</span> ZE-Payroll</div>
-                <div class="demo-nav-label">Overview</div>
-                <button class="demo-nav-item active" data-demo="dashboard"><i class="fas fa-th-large"></i> Dashboard</button>
-                <div class="demo-nav-label">Manage</div>
-                <button class="demo-nav-item" data-demo="employees"><i class="fas fa-users"></i> Employees</button>
-                <button class="demo-nav-item" data-demo="dtr"><i class="fas fa-clock"></i> DTR Entries</button>
-                <button class="demo-nav-item" data-demo="qr"><i class="fas fa-qrcode"></i> QR Scanner</button>
-                <div class="demo-nav-label">Payday</div>
-                <button class="demo-nav-item" data-demo="payroll"><i class="fas fa-money-bill-wave"></i> Payroll</button>
-                <button class="demo-nav-item" data-demo="reports"><i class="fas fa-chart-bar"></i> Reports</button>
-                <div class="demo-nav-label">System</div>
-                <button class="demo-nav-item" data-demo="settings"><i class="fas fa-cog"></i> Settings</button>
-                <div class="demo-sidebar-foot">
-                    <a href="register.html?plan=trial" class="btn btn-lime btn-block" style="font-size:13px; padding:10px 14px;">Try it free →</a>
-                </div>
-            </nav>
-
-            <!-- Preview panels -->
-            <div class="demo-panel-area">
-
-                <!-- DASHBOARD -->
-                <div class="demo-panel active" data-panel="dashboard">
-                    <div class="demo-panel-title">Dashboard</div>
-                    <div class="demo-panel-sub">Your whole payroll status, at a glance.</div>
-                    <div class="demo-stat-grid">
-                        <div class="demo-stat-card">
-                            <div class="demo-stat-icon" style="background:rgba(59,130,246,.15); color:#60a5fa;"><i class="fas fa-users"></i></div>
-                            <div><b>8</b><span>Total Employees</span></div>
-                        </div>
-                        <div class="demo-stat-card">
-                            <div class="demo-stat-icon" style="background:rgba(34,197,94,.15); color:#4ade80;"><i class="fas fa-check"></i></div>
-                            <div><b>7</b><span>Present Today</span></div>
-                        </div>
-                        <div class="demo-stat-card">
-                            <div class="demo-stat-icon" style="background:rgba(234,179,8,.15); color:#fbbf24;"><i class="fas fa-clock"></i></div>
-                            <div><b>1</b><span>Late Today</span></div>
-                        </div>
-                        <div class="demo-stat-card">
-                            <div class="demo-stat-icon" style="background:rgba(195,255,77,.15); color:#c3ff4d;"><i class="fas fa-money-bill-wave"></i></div>
-                            <div><b>₱86,240</b><span>Total Payroll (net)</span></div>
-                        </div>
-                    </div>
-                    <div class="demo-grid-2">
-                        <div class="demo-card">
-                            <h4>Recent DTR Entries</h4>
-                            <div class="demo-list-row"><span class="demo-list-name">Maria Santos</span><span class="demo-list-sub">8:00 – 17:06</span><span class="demo-pill ok">Present</span></div>
-                            <div class="demo-list-row"><span class="demo-list-name">Jerome Cruz</span><span class="demo-list-sub">8:14 – 17:00</span><span class="demo-pill warn">Late</span></div>
-                            <div class="demo-list-row"><span class="demo-list-name">Ana Reyes</span><span class="demo-list-sub">7:58 – 18:02</span><span class="demo-pill ok">Present</span></div>
-                            <div class="demo-list-row"><span class="demo-list-name">Paolo Ramos</span><span class="demo-list-sub">8:00 – 17:00</span><span class="demo-pill ok">Present</span></div>
-                        </div>
-                        <div class="demo-card">
-                            <h4>Attendance This Week</h4>
-                            <div class="demo-bars">
-                                <div class="demo-bar" style="height:70%;"><span>Mon</span></div>
-                                <div class="demo-bar" style="height:82%;"><span>Tue</span></div>
-                                <div class="demo-bar" style="height:60%;"><span>Wed</span></div>
-                                <div class="demo-bar" style="height:88%;"><span>Thu</span></div>
-                                <div class="demo-bar" style="height:76%;"><span>Fri</span></div>
-                                <div class="demo-bar" style="height:40%;"><span>Sat</span></div>
-                                <div class="demo-bar" style="height:12%;"><span>Sun</span></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- EMPLOYEES -->
-                <div class="demo-panel" data-panel="employees">
-                    <div class="demo-panel-title">Employees</div>
-                    <div class="demo-panel-sub">Rates, positions, and status — one place to keep it all current.</div>
-                    <table class="demo-table">
-                        <thead><tr><th>ID</th><th>Name</th><th>Position</th><th class="num">Rate</th><th>Status</th></tr></thead>
-                        <tbody>
-                            <tr><td class="dim">EMP-001</td><td>Maria Santos</td><td class="dim">Cashier</td><td class="num">₱500/day</td><td><span class="demo-pill ok">Active</span></td></tr>
-                            <tr><td class="dim">EMP-002</td><td>Jerome Cruz</td><td class="dim">Warehouse Staff</td><td class="num">₱75/hr</td><td><span class="demo-pill ok">Active</span></td></tr>
-                            <tr><td class="dim">EMP-003</td><td>Ana Reyes</td><td class="dim">Sales Associate</td><td class="num">₱520/day</td><td><span class="demo-pill ok">Active</span></td></tr>
-                            <tr><td class="dim">EMP-004</td><td>Paolo Ramos</td><td class="dim">Delivery Rider</td><td class="num">₱480/day</td><td><span class="demo-pill ok">Active</span></td></tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- DTR -->
-                <div class="demo-panel" data-panel="dtr">
-                    <div class="demo-panel-title">Daily Time Record</div>
-                    <div class="demo-panel-sub">Every time-in, time-out, OT hour, and late minute — logged automatically.</div>
-                    <table class="demo-table">
-                        <thead><tr><th>Employee</th><th>Time In</th><th>Time Out</th><th class="num">Hours</th><th class="num">OT</th><th class="num">Late</th><th>Status</th></tr></thead>
-                        <tbody>
-                            <tr><td>Maria Santos</td><td class="dim">8:00 AM</td><td class="dim">5:06 PM</td><td class="num">9.10</td><td class="num">1.10</td><td class="num">0m</td><td><span class="demo-pill ok">Present</span></td></tr>
-                            <tr><td>Jerome Cruz</td><td class="dim">8:14 AM</td><td class="dim">5:00 PM</td><td class="num">8.77</td><td class="num">0.77</td><td class="num">14m</td><td><span class="demo-pill warn">Late</span></td></tr>
-                            <tr><td>Ana Reyes</td><td class="dim">7:58 AM</td><td class="dim">6:02 PM</td><td class="num">10.07</td><td class="num">2.07</td><td class="num">0m</td><td><span class="demo-pill ok">Present</span></td></tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- QR SCANNER -->
-                <div class="demo-panel" data-panel="qr">
-                    <div class="demo-panel-title">QR Time Clock</div>
-                    <div class="demo-panel-sub">Every employee gets a personal QR code. Scan in, scan out — no typing, no buddy-punching.</div>
-                    <div class="demo-qr-row">
-                        <div class="demo-qr-box"><div class="qr-mock"></div></div>
-                        <div class="demo-scan-feed">
-                            <div class="demo-scan-item"><i class="fas fa-circle-check"></i> <div><span class="demo-list-name">Maria Santos</span> — Time In <span class="demo-list-sub">· 8:00 AM</span></div></div>
-                            <div class="demo-scan-item"><i class="fas fa-circle-check"></i> <div><span class="demo-list-name">Jerome Cruz</span> — Time In <span class="demo-list-sub">· 8:14 AM</span></div></div>
-                            <div class="demo-scan-item"><i class="fas fa-circle-check"></i> <div><span class="demo-list-name">Ana Reyes</span> — Time Out <span class="demo-list-sub">· 6:02 PM</span></div></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- PAYROLL -->
-                <div class="demo-panel" data-panel="payroll">
-                    <div class="demo-panel-title">Payroll</div>
-                    <div class="demo-panel-sub">OT, lateness, and SSS / PhilHealth / Pag-IBIG — computed the moment attendance is in.</div>
-                    <table class="demo-table">
-                        <thead><tr><th>Employee</th><th class="num">Days</th><th class="num">Reg. Pay</th><th class="num">OT Pay</th><th class="num">Deductions</th><th class="num">Net Pay</th></tr></thead>
-                        <tbody>
-                            <tr><td>Maria Santos</td><td class="num dim">11</td><td class="num dim">₱5,500.00</td><td class="num dim">₱962.50</td><td class="num dim">-₱312.50</td><td class="num" style="color:#4ade80; font-weight:700;">₱6,150.00</td></tr>
-                            <tr><td>Jerome Cruz</td><td class="num dim">11</td><td class="num dim">₱6,600.00</td><td class="num dim">₱515.63</td><td class="num dim">-₱410.00</td><td class="num" style="color:#4ade80; font-weight:700;">₱6,705.63</td></tr>
-                            <tr><td>Ana Reyes</td><td class="num dim">11</td><td class="num dim">₱5,720.00</td><td class="num dim">₱1,081.20</td><td class="num dim">-₱325.00</td><td class="num" style="color:#4ade80; font-weight:700;">₱6,476.20</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- REPORTS -->
-                <div class="demo-panel" data-panel="reports">
-                    <div class="demo-panel-title">Payroll Summary Report</div>
-                    <div class="demo-panel-sub">One-click summary for the cutoff — ready to export or hand to your accountant.</div>
-                    <div class="demo-report-summary">
-                        <div class="demo-report-row"><span class="lbl">Total Gross Pay</span><span>₱91,480.00</span></div>
-                        <div class="demo-report-row"><span class="lbl">Total Deductions</span><span class="neg">-₱5,240.00</span></div>
-                        <div class="demo-report-row total"><span class="lbl">Total Net Pay</span><span>₱86,240.00</span></div>
-                    </div>
-                </div>
-
-                <!-- SETTINGS -->
-                <div class="demo-panel" data-panel="settings">
-                    <div class="demo-panel-title">Settings</div>
-                    <div class="demo-panel-sub">The rules behind every computation — set once, applied every cutoff.</div>
-                    <div class="demo-card" style="max-width:520px;">
-                        <div class="demo-settings-row">
-                            <div><div class="label">Overtime Rate</div><div class="desc">125% of hourly rate (PH standard)</div></div>
-                            <div class="demo-toggle"></div>
-                        </div>
-                        <div class="demo-settings-row">
-                            <div><div class="label">Geofenced Attendance</div><div class="desc">QR clock-ins locked to office coordinates</div></div>
-                            <div class="demo-toggle"></div>
-                        </div>
-                        <div class="demo-settings-row">
-                            <div><div class="label">Statutory Deductions</div><div class="desc">SSS, PhilHealth, Pag-IBIG auto-computed</div></div>
-                            <div class="demo-toggle"></div>
-                        </div>
-                        <div class="demo-settings-row">
-                            <div><div class="label">Sunday OT-Only Pay</div><div class="desc">Sunday hours pay OT rate with no base rate</div></div>
-                            <div class="demo-toggle off"></div>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-
-        <div class="demo-cta">
-            <p>This is sample data — your real dashboard fills in as your team clocks in.</p>
-            <a href="register.html?plan=trial" class="btn btn-primary btn-lg">Start Free Trial</a>
-        </div>
+  <!-- ============ FINAL CTA ============ -->
+  <section class="cta-band">
+    <div class="container cta-inner reveal" data-reveal>
+      <h2>Ready to run your counter on ZE-POS?</h2>
+      <p>Join the food businesses selling smarter every day. Free to try, ₱499/mo when you stay.</p>
+      <div class="hero-actions">
+        <a href="register.html" class="btn btn-light btn-lg">Get Started Free</a>
+        <a href="features.html" class="btn btn-ghost-light btn-lg">See Features</a>
+      </div>
     </div>
-</section>
+  </section>
 
-<!-- ============ PRICING ============ -->
-<section id="pricing" class="pricing-wrap">
-    <div class="wrap">
-        <div class="section-head on-dark">
-            <div class="kicker">Pricing</div>
-            <h2>Try it free, then pick a plan that fits your cutoff.</h2>
-            <p>Same full feature set on every plan — you're only choosing how long you're locking in the rate.</p>
-        </div>
-        <div class="price-grid">
-
-            <div class="price-card">
-                <div class="price-name">5-Day Trial</div>
-                <div class="price-amount"><b>₱0</b></div>
-                <div class="price-sub">Full access, no card required</div>
-                <ul class="price-feats">
-                    <li><i class="fas fa-check"></i> Unlimited employees</li>
-                    <li><i class="fas fa-check"></i> QR & manual attendance</li>
-                    <li><i class="fas fa-check"></i> Automated payroll & payslips</li>
-                    <li><i class="fas fa-check"></i> PH statutory deductions</li>
-                </ul>
-                <a href="register.html?plan=trial" class="btn btn-ghost btn-block">Start Free Trial</a>
-            </div>
-
-            <div class="price-card">
-                <div class="price-name">3-Month Plan</div>
-                <div class="price-amount"><b>₱399</b><span>/ 3 months</span></div>
-                <div class="price-sub">≈ ₱133 per month</div>
-                <ul class="price-feats">
-                    <li><i class="fas fa-check"></i> Unlimited employees</li>
-                    <li><i class="fas fa-check"></i> QR & manual attendance</li>
-                    <li><i class="fas fa-check"></i> Automated payroll & payslips</li>
-                    <li><i class="fas fa-check"></i> PH statutory deductions</li>
-                    <li><i class="fas fa-check"></i> Email support</li>
-                </ul>
-                <a href="register.html?plan=3mo" class="btn btn-outline-dark btn-block" style="color:#fff; border-color:rgba(255,255,255,.25);">Choose 3 Months</a>
-            </div>
-
-            <div class="price-card featured">
-                <div class="price-tag">Best value</div>
-                <div class="price-name">6-Month Plan</div>
-                <div class="price-amount"><b>₱599</b><span>/ 6 months</span></div>
-                <div class="price-sub">≈ ₱99.83 per month</div>
-                <ul class="price-feats">
-                    <li><i class="fas fa-check"></i> Unlimited employees</li>
-                    <li><i class="fas fa-check"></i> QR & manual attendance</li>
-                    <li><i class="fas fa-check"></i> Automated payroll & payslips</li>
-                    <li><i class="fas fa-check"></i> PH statutory deductions</li>
-                    <li><i class="fas fa-check"></i> Priority email support</li>
-                </ul>
-                <a href="register.html?plan=6mo" class="btn btn-lime btn-block">Choose 6 Months</a>
-            </div>
-
-        </div>
+  <!-- ============ FOOTER ============ -->
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <a href="index.html" class="brand">
+          <span class="brand-mark">Z</span>
+          <span class="brand-text">ZE<span class="brand-accent">·</span>POS</span>
+        </a>
+        <p>Cloud point-of-sale for restaurants, cafés & food counters.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Product</h4>
+        <a href="features.html">Features</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#how">How it works</a>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <a href="contact.html">Contact</a>
+        <a href="#">About</a>
+        <a href="#">Careers</a>
+      </div>
+      <div class="footer-col">
+        <h4>Get in touch</h4>
+        <a href="mailto:ze.pos.official@gmail.com">ze.pos.official@gmail.com</a>
+        <a href="contact.html">Book a demo</a>
+      </div>
+      <div class="footer-col">
+        <h4>Follow</h4>
+        <a href="https://facebook.com/YOUR-PAGE-HERE" target="_blank" rel="noopener">Facebook</a>
+      </div>
     </div>
-</section>
-
-<!-- ============ FAQ ============ -->
-<section id="faq">
-    <div class="wrap">
-        <div class="section-head">
-            <div class="kicker">FAQ</div>
-            <h2>Questions worth answering upfront.</h2>
-        </div>
-        <div class="faq-list">
-
-            <div class="faq-item">
-                <button class="faq-q">What happens when my trial ends?<i class="fas fa-plus"></i></button>
-                <div class="faq-a"><p>Nothing is deleted. Your employees and attendance history stay put — subscribe to a 3- or 6-month plan whenever you're ready to keep going.</p></div>
-            </div>
-            <div class="faq-item">
-                <button class="faq-q">Does it compute SSS, PhilHealth, and Pag-IBIG automatically?<i class="fas fa-plus"></i></button>
-                <div class="faq-a"><p>Yes — built-in PH statutory contribution tables handle the employee share automatically each period, with room to override per employee if you need to.</p></div>
-            </div>
-            <div class="faq-item">
-                <button class="faq-q">How does Sunday overtime work?<i class="fas fa-plus"></i></button>
-                <div class="faq-a"><p>Turn on the Sunday rule in Settings and every hour worked on a Sunday pays at OT rate only — no base day pay — matching how a lot of Philippine businesses already handle Sunday premium.</p></div>
-            </div>
-            <div class="faq-item">
-                <button class="faq-q">Can employees clock in without installing an app?<i class="fas fa-plus"></i></button>
-                <div class="faq-a"><p>Yes. Each employee gets a personal QR code that a shared kiosk or scanner can read, and admins can always log a day manually if someone forgets to scan.</p></div>
-            </div>
-            <div class="faq-item">
-                <button class="faq-q">Can I stop employees from clocking in outside the office?<i class="fas fa-plus"></i></button>
-                <div class="faq-a"><p>Yes — turn on Attendance Security in Settings, set your office coordinates and an allowed radius, and QR clock-ins outside that radius are rejected on the server, not just hidden in the browser.</p></div>
-            </div>
-            <div class="faq-item">
-                <button class="faq-q">Can I export or print payslips?<i class="fas fa-plus"></i></button>
-                <div class="faq-a"><p>Every payslip can be generated and printed per employee, per pay period, whenever you run payroll.</p></div>
-            </div>
-            <div class="faq-item">
-                <button class="faq-q">Is my payroll data secure?<i class="fas fa-plus"></i></button>
-                <div class="faq-a"><p>Data is stored on encrypted, access-controlled infrastructure, with admin login required to view or edit anything.</p></div>
-            </div>
-
-        </div>
+    <div class="footer-bottom container">
+      <span>© 2026 ZE-POS. All rights reserved.</span>
+      <span>Made for  businesses everywhere.</span>
     </div>
-</section>
+  </footer>
 
-<!-- ============ FINAL CTA ============ -->
-<section>
-    <div class="wrap">
-        <div class="cta-band">
-            <h2>Run your next cutoff without the spreadsheet.</h2>
-            <p>Five days, full access, nothing to install for your team beyond a QR code.</p>
-            <div class="hero-ctas">
-                <a href="register.html?plan=trial" class="btn btn-lime btn-lg">Start Free Trial</a>
-                <a href="app.html" class="btn btn-ghost btn-lg" style="border-color:rgba(255,255,255,.3);">Login</a>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- ============ FOOTER ============ -->
-<footer>
-    <div class="wrap">
-        <div class="foot-grid">
-            <div class="foot-brand">
-                <div class="brand" style="color:var(--on-dark);">
-                    <span class="brand-mark">ZE</span> ZE Payroll
-                </div>
-                <p>Attendance, computation, and payslips — one system, one payday routine.</p>
-            </div>
-            <div class="foot-col">
-                <h4>Product</h4>
-                <ul>
-                    <li><a href="#features">Features</a></li>
-                    <li><a href="#how-it-works">How It Works</a></li>
-                    <li><a href="#pricing">Pricing</a></li>
-                </ul>
-            </div>
-            <div class="foot-col">
-                <h4>Account</h4>
-                <ul>
-                    <li><a href="app.html">Login</a></li>
-                    <li><a href="register.html?plan=trial">Start Free Trial</a></li>
-                </ul>
-            </div>
-            <div class="foot-col">
-                <h4>Support</h4>
-                <ul>
-                    <li><a href="#faq">FAQ</a></li>
-                </ul>
-            </div>
-        </div>
-        <div class="foot-bottom">
-            <span>&copy; <span id="year"></span> ZE Payroll. All rights reserved.</span>
-        </div>
-    </div>
-</footer>
-
-<script>
-    // Sticky navbar appearance change
-    const nav = document.getElementById('siteNav');
-    const onScroll = () => {
-        if (window.scrollY > 24) nav.classList.add('scrolled');
-        else nav.classList.remove('scrolled');
-    };
-    document.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
-
-    // Mobile nav toggle
-    const navToggle = document.getElementById('navToggle');
-    const navLinks = document.getElementById('navLinks');
-    navToggle.addEventListener('click', () => {
-        const isOpen = navLinks.classList.toggle('open');
-        navToggle.setAttribute('aria-expanded', String(isOpen));
-        navToggle.innerHTML = isOpen ? '<i class="fas fa-xmark"></i>' : '<i class="fas fa-bars"></i>';
-    });
-    navLinks.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
-        navLinks.classList.remove('open');
-        navToggle.setAttribute('aria-expanded', 'false');
-        navToggle.innerHTML = '<i class="fas fa-bars"></i>';
-    }));
-
-    // Command-center demo: sidebar swaps the preview panel, no page reload
-    document.querySelectorAll('.demo-nav-item').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const target = btn.getAttribute('data-demo');
-            document.querySelectorAll('.demo-nav-item').forEach(b => b.classList.toggle('active', b === btn));
-            document.querySelectorAll('.demo-panel').forEach(p => p.classList.toggle('active', p.getAttribute('data-panel') === target));
-        });
-    });
-
-    // FAQ accordion
-    document.querySelectorAll('.faq-item').forEach(item => {
-        const q = item.querySelector('.faq-q');
-        const a = item.querySelector('.faq-a');
-        q.addEventListener('click', () => {
-            const isOpen = item.classList.contains('open');
-            document.querySelectorAll('.faq-item.open').forEach(open => {
-                if (open !== item) {
-                    open.classList.remove('open');
-                    open.querySelector('.faq-a').style.maxHeight = null;
-                }
-            });
-            item.classList.toggle('open', !isOpen);
-            a.style.maxHeight = !isOpen ? a.scrollHeight + 'px' : null;
-        });
-    });
-
-    // One orchestrated hero animation: net pay counts up on load
-    const counterEl = document.getElementById('netPayCounter');
-    const target = 5522.50;
-    let started = false;
-    const runCounter = () => {
-        if (started) return;
-        started = true;
-        const duration = 1400;
-        const startTime = performance.now();
-        const step = (now) => {
-            const progress = Math.min(1, (now - startTime) / duration);
-            const eased = 1 - Math.pow(1 - progress, 3);
-            const value = target * eased;
-            counterEl.textContent = '₱' + value.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            if (progress < 1) requestAnimationFrame(step);
-        };
-        requestAnimationFrame(step);
-    };
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        counterEl.textContent = '₱' + target.toLocaleString('en-PH', { minimumFractionDigits: 2 });
-    } else {
-        setTimeout(runCounter, 500);
-    }
-
-    // Remember which plan someone picked so app.html can read it later
-    document.querySelectorAll('a[href*="plan="]').forEach(a => {
-        a.addEventListener('click', () => {
-            const plan = new URL(a.href, window.location.href).searchParams.get('plan');
-            try { localStorage.setItem('ze_selected_plan', plan); } catch (e) {}
-        });
-    });
-
-    document.getElementById('year').textContent = new Date().getFullYear();
-</script>
+  <script src="landing/assets/js/main.js"></script>
 </body>
 </html>
