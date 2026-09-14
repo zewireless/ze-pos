@@ -2,254 +2,1173 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#6366f1">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="ZE-POS">
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
-    <title>ZE-POS</title>
-    <link rel="stylesheet" href="css/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZE-Payroll Management System</title>
+    <!-- Apply saved/preferred theme before first paint to avoid a light/dark flash -->
+    <script>
+        (function () {
+            var saved = localStorage.getItem('ze_payroll_theme');
+            var theme = saved || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- QR Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 </head>
 <body>
-    <div class="app-layout">
+    <div class="app-container">
         <!-- Sidebar -->
-        <aside class="sidebar" id="sidebar">
-            <div class="sidebar-brand">
-                <div class="sidebar-brand-icon"><img src="assets/logo.png" alt="ZE-POS logo"></div>
-                <div class="sidebar-brand-text">
-                    ZE
-                    <small>Point of Sale</small>
-                </div>
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <a href="index.html" title="Visit ZE Payroll website" style="display:flex; align-items:center; gap:10px; color:inherit; text-decoration:none;">
+                    <i class="fas fa-building"></i>
+                    <span>ZE-Payroll</span>
+                </a>
             </div>
-
-            <nav class="sidebar-nav" id="sidebarNav">
-                <div class="sidebar-section">Main</div>
-                <a class="sidebar-link active" data-page="dashboard">
-                    <span class="icon">📊</span> Dashboard
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-page="dashboard">
+                    <i class="fas fa-th-large"></i>
+                    <span>Dashboard</span>
                 </a>
-                <a class="sidebar-link" data-page="pos">
-                    <span class="icon">🛒</span> POS Screen
+                <a href="#" class="nav-item" data-page="employees">
+                    <i class="fas fa-users"></i>
+                    <span>Employees</span>
                 </a>
-
-                <div class="sidebar-section admin-only">Management</div>
-                <a class="sidebar-link admin-only" data-page="staff">
-                    <span class="icon">👥</span> Staff
+                <a href="#" class="nav-item" data-page="dtr">
+                    <i class="fas fa-clock"></i>
+                    <span>DTR Entries</span>
                 </a>
-                <a class="sidebar-link admin-only" data-page="categories">
-                    <span class="icon">📁</span> Categories
+                <a href="#" class="nav-item" data-page="qr">
+                    <i class="fas fa-qrcode"></i>
+                    <span>QR Scanner</span>
                 </a>
-                <a class="sidebar-link admin-only" data-page="menu">
-                    <span class="icon">📋</span> Menu Items
+                <a href="#" class="nav-item" data-page="payroll">
+                    <i class="fas fa-money-bill-wave"></i>
+                    <span>Payroll</span>
                 </a>
-                <a class="sidebar-link admin-only" data-page="bundles">
-                    <span class="icon">🍽</span> Bundles / Combos
+                <a href="#" class="nav-item" data-page="settings">
+                    <i class="fas fa-cog"></i>
+                    <span>Settings</span>
                 </a>
-                <a class="sidebar-link admin-only" data-page="condiments">
-                    <span class="icon">🧀</span> Condiments
-                </a>
-                <a class="sidebar-link admin-only" data-page="tax">
-                    <span class="icon">💰</span> Tax Setup
-                </a>
-                <a class="sidebar-link admin-only" data-page="stock">
-                    <span class="icon">📦</span> Stock & Inventory
-                </a>
-                <a class="sidebar-link admin-only" data-page="schedules">
-                    <span class="icon">📅</span> Shift Schedules
-                </a>
-
-                <div class="sidebar-section">Reports</div>
-                <a class="sidebar-link" data-page="orders">
-                    <span class="icon">📑</span> Order History
-                </a>
-                <a class="sidebar-link" data-page="reports">
-                    <span class="icon">📈</span> Sales Reports
-                </a>
-                <a class="sidebar-link" data-page="shifts">
-                    <span class="icon">🕐</span> Shifts
-                </a>
-                <a class="sidebar-link admin-only" data-page="payroll">
-                    <span class="icon">💰</span> Payroll
-                </a>
-                <a class="sidebar-link admin-only" data-page="leaderboards">
-                    <span class="icon">🏆</span> Leaderboards
-                </a>
-                <a class="sidebar-link admin-only" data-page="multistore">
-                    <span class="icon">🏪</span> Multi-Store Reports
-                </a>
-
-                <a class="sidebar-link" data-page="cybercafe">
-                    <span class="icon">🖥</span> Internet Café
-                </a>
-
-                
-                <div class="sidebar-section admin-only">System</div>
-                <a class="sidebar-link admin-only" data-page="settings">
-                    <span class="icon">⚙️</span> Settings
-                </a>
-
-                <div class="sidebar-section">Account</div>
-                <a class="sidebar-link admin-only" data-page="billing">
-                    <span class="icon">💳</span> Billing & Subscription
-                </a>
-                <a class="sidebar-link super-admin-only" href="admin.html">
-                    <span class="icon">🛠</span> Admin Dashboard
-                </a>
-                <div class="sidebar-section">Tools</div>
-                <a class="sidebar-link admin-only" id="navCustomerDisplay" href="customer-display.html" target="_blank">
-                    <span class="icon">🖥</span> Customer Display
+                <a href="#" class="nav-item" data-page="reports">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>Reports</span>
                 </a>
             </nav>
-
             <div class="sidebar-footer">
-                <div class="sidebar-user">
-                    <div class="sidebar-avatar" id="userAvatar">A</div>
-                    <div class="sidebar-user-info">
-                        <div class="sidebar-user-name" id="userName">Admin</div>
-                        <div class="sidebar-user-role" id="userRole">Admin</div>
+                <div class="user-info">
+                    <div class="user-avatar">AD</div>
+                    <div class="user-details">
+                        <small>Admin User</small>
+                        <small>Super Admin</small>
                     </div>
                 </div>
-                <button class="btn-logout" id="btnLogout">🚪 Logout</button>
+                <button class="btn btn-outline" style="width: 100%; margin-top: 12px; justify-content: center;" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
             </div>
         </aside>
 
+        <!-- Sidebar overlay for mobile -->
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
         <!-- Main Content -->
         <main class="main-content">
-            <header class="header">
-                <div style="display:flex;align-items:center;gap:12px;">
-                    <button class="btn btn-ghost btn-icon" id="menuToggle" style="display:none;">☰</button>
-                    <h1 class="header-title" id="pageTitle">Dashboard</h1>
+            <header class="top-bar">
+                <button class="btn btn-outline hamburger-btn" id="hamburgerBtn" onclick="toggleSidebar()" aria-label="Toggle menu">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="page-title">
+                    <h1 id="pageTitle">Dashboard</h1>
+                    <small id="pageSubtitle" class="text-muted">Overview of your payroll system</small>
                 </div>
-                <div class="header-actions" id="headerActions">
-                    <div class="store-switcher" id="storeSwitcher" style="display:none;">
-                        <span class="store-switcher-label">🏪 Store</span>
-                        <select id="storeSelect" class="form-control form-control-sm" title="Switch store">
-                            <option value="">Select Store…</option>
-                        </select>
-                    </div>
+                <div class="header-actions">
+                    <button class="btn btn-outline" id="themeToggleBtn" onclick="toggleTheme()" aria-label="Toggle dark mode" title="Toggle dark mode">
+                        <i class="fas fa-moon" id="themeToggleIcon"></i>
+                    </button>
+                    <button class="btn btn-outline" onclick="exportData()">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                    <button class="btn btn-primary" onclick="showAddModal()">
+                        <i class="fas fa-plus"></i> Add New
+                    </button>
                 </div>
             </header>
 
-            <div class="content-area" id="contentArea">
-                <!-- Dashboard Module -->
-                <section class="page-module" id="page-dashboard"></section>
+            <!-- Dashboard Page -->
+            <div class="page active" id="page-dashboard">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon employees">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="totalEmployees">0</span>
+                            <span class="stat-label">Total Employees</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon attendance">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="presentToday">0</span>
+                            <span class="stat-label">Present Today</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon late">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="lateToday">0</span>
+                            <span class="stat-label">Late Today</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon payroll">
+                            <i class="fas fa-money-bill-wave"></i>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="totalPayroll">₱0</span>
+                            <span class="stat-label">Total Payroll</span>
+                        </div>
+                    </div>
+                </div>
 
-                <!-- POS Module -->
-                <section class="page-module" id="page-pos"></section>
+                <div class="content-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Recent DTR Entries</h3>
+                            <a href="#" class="btn-link" onclick="navigateTo('dtr')">View All</a>
+                        </div>
+                        <div class="card-body">
+                            <div class="dtr-mini-list" id="recentDTR"></div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Attendance Summary</h3>
+                            <small class="text-muted">This week</small>
+                        </div>
+                        <div class="card-body">
+                            <div class="attendance-chart" id="attendanceChart"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                <!-- Staff Module -->
-                <section class="page-module" id="page-staff"></section>
+            <!-- Employees Page -->
+            <div class="page" id="page-employees">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Employee List</h3>
+                        <div class="search-box">
+                            <input type="text" id="employeeSearch" placeholder="Search employees..." class="form-control">
+                            <button class="btn btn-primary btn-sm" onclick="addEmployee()">
+                                <i class="fas fa-plus"></i> Add Employee
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table" id="employeeTable">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Photo</th>
+                                        <th>Name</th>
+                                        <th>Position</th>
+                                        <th>Daily Rate</th>
+                                        <th>Hourly Rate</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="employeeTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                <!-- Categories Module -->
-                <section class="page-module" id="page-categories"></section>
+            <!-- DTR Page -->
+            <div class="page" id="page-dtr">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Daily Time Record (DTR)</h3>
+                        <div class="filter-box">
+                            <select id="dtrEmployeeFilter" class="form-control" onchange="loadDTR()">
+                                <option value="">All Employees</option>
+                            </select>
+                            <button class="btn btn-primary btn-sm" onclick="showDTRAddModal()">
+                                <i class="fas fa-plus"></i> Manual Entry
+                            </button>
+                            <button class="btn btn-outline btn-sm" onclick="showPasteDTRModal()">
+                                <i class="fas fa-paste"></i> Paste DTR Data
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="dtr-range-bar">
+                            <div class="dtr-range-dates">
+                                <div class="form-group">
+                                    <label class="text-muted">From</label>
+                                    <input type="date" id="dtrDateFrom" class="form-control" onchange="loadDTR()">
+                                </div>
+                                <div class="form-group">
+                                    <label class="text-muted">To</label>
+                                    <input type="date" id="dtrDateTo" class="form-control" onchange="loadDTR()">
+                                </div>
+                            </div>
+                            <div class="dtr-range-presets">
+                                <button class="btn btn-sm btn-outline" onclick="setDtrRangePreset('first-half')">1st Half (1-15)</button>
+                                <button class="btn btn-sm btn-outline" onclick="setDtrRangePreset('second-half')">2nd Half (16-End)</button>
+                                <button class="btn btn-sm btn-outline" onclick="setDtrRangePreset('full-month')">Full Month</button>
+                                <button class="btn btn-sm btn-outline" onclick="setDtrRangePreset('today')">Today</button>
+                            </div>
+                            <button class="btn btn-sm btn-primary dtr-export-btn" onclick="exportDtrRange()">
+                                <i class="fas fa-file-csv"></i> Export CSV
+                            </button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table" id="dtrTable">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Employee</th>
+                                        <th>Time In</th>
+                                        <th>Time Out</th>
+                                        <th>Total Hours</th>
+                                        <th>OT Hours</th>
+                                        <th>Late (min)</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dtrTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                <!-- Menu Module -->
-                <section class="page-module" id="page-menu"></section>
+            <!-- QR Scanner Page -->
+            <div class="page" id="page-qr">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <div class="qr-container">
+                            <div class="qr-scanner-area" id="qrScannerArea">
+                                <i class="fas fa-camera"></i>
+                                <h3>QR Scanner</h3>
+                                <p>Point your camera at the employee QR code</p>
+                                <div class="qr-placeholder">
+                                    <div class="qr-frame">
+                                        <i class="fas fa-qrcode fa-3x"></i>
+                                    </div>
+                                </div>
+                                <div class="qr-status" id="qrStatus">
+                                    <span class="badge badge-info">Ready to Scan</span>
+                                </div>
+                            </div>
+                            <div class="qr-result hidden" id="qrResult">
+                                <div class="qr-result-content">
+                                    <i class="fas fa-check-circle text-success"></i>
+                                    <h4>Employee Checked In</h4>
+                                    <p id="qrEmployeeName"></p>
+                                    <p id="qrTimestamp"></p>
+                                    <button class="btn btn-primary" onclick="scanAnother()">
+                                        <i class="fas fa-redo"></i> Scan Another
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
 
-                <!-- Bundles Module -->
-                <section class="page-module" id="page-bundles"></section>
+                        <div class="qr-info-cards mt-3">
+                            <div class="qr-info-card">
+                                <i class="fas fa-info-circle"></i>
+                                <h5>How to Use QR Scanner</h5>
+                                <p>Each employee has a unique QR code. When they scan it, their time in/out is automatically logged.</p>
+                            </div>
+                            <div class="qr-info-card">
+                                <i class="fas fa-print"></i>
+                                <h5>Generate QR Codes</h5>
+                                <button class="btn btn-outline btn-sm" onclick="generateAllQRCodes()">
+                                    <i class="fas fa-qrcode"></i> Generate All
+                                </button>
+                            </div>
+                        </div>
 
-                <!-- Condiments Module -->
-                <section class="page-module" id="page-condiments"></section>
+                        <div class="card mt-3">
+                            <div class="card-header">
+                                <h5>Employee QR Codes</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="qr-grid" id="qrCodeGrid"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                <!-- Stock Module -->
-                <section class="page-module" id="page-stock"></section>
+            <!-- Payroll Page -->
+            <div class="page" id="page-payroll">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Payroll Processing</h3>
+                        <div class="filter-box">
+                            <select id="payrollEmployeeFilter" class="form-control" onchange="loadPayroll()">
+                                <option value="">All Employees</option>
+                            </select>
+                            <input type="month" id="payrollMonthFilter" class="form-control" onchange="loadPayroll()">
+                            <select id="payrollPeriodFilter" class="form-control" onchange="loadPayroll()"></select>
+                            <button class="btn btn-success btn-sm" onclick="processPayroll()">
+                                <i class="fas fa-calculator"></i> Compute Payroll
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p id="payrollPeriodInfo" class="text-muted" style="font-size: 13px; margin-top: -8px; margin-bottom: 12px;"></p>
+                        <div class="table-responsive">
+                            <table class="table" id="payrollTable">
+                                <thead>
+                                    <tr>
+                                        <th>Employee</th>
+                                        <th>Days Worked</th>
+                                        <th>Total Hours</th>
+                                        <th>Regular Pay</th>
+                                        <th>OT Pay</th>
+                                        <th>Late Deduction</th>
+                                        <th>Deductions</th>
+                                        <th>Total Deductions</th>
+                                        <th>Net Pay</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="payrollTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                <!-- Tax Module -->
-                <section class="page-module" id="page-tax"></section>
+            <!-- Settings Page -->
+            <div class="page" id="page-settings">
+                <div class="settings-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-globe-asia"></i> Date &amp; Time Settings</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label>System Timezone</label>
+                                <select id="appTimezone" class="form-control">
+                                    <option value="Asia/Manila">Philippine Time (Asia/Manila, UTC+8)</option>
+                                    <option value="UTC">UTC</option>
+                                    <option value="Asia/Singapore">Asia/Singapore (UTC+8)</option>
+                                    <option value="Asia/Hong_Kong">Asia/Hong Kong (UTC+8)</option>
+                                    <option value="Asia/Tokyo">Asia/Tokyo (UTC+9)</option>
+                                    <option value="Asia/Dubai">Asia/Dubai (UTC+4)</option>
+                                    <option value="America/Los_Angeles">America/Los Angeles (US Pacific)</option>
+                                    <option value="America/New_York">America/New York (US Eastern)</option>
+                                    <option value="Europe/London">Europe/London</option>
+                                </select>
+                                <small class="text-muted">All "Today" dates, DTR/QR timestamps, and payroll periods are computed in this timezone, regardless of the device's own clock.</small>
+                            </div>
+                            <div class="form-group">
+                                <div class="checkbox-label">
+                                    <input type="checkbox" id="dtOverrideEnabled" onchange="onDtOverrideToggle()">
+                                    <span>Override current date &amp; time (for testing future dates)</span>
+                                </div>
+                            </div>
+                            <div class="form-group" id="dtOverrideValueGroup">
+                                <label>Set app's "current" date &amp; time</label>
+                                <input type="datetime-local" id="dtOverrideValue" class="form-control">
+                                <small class="text-muted">The clock will keep running forward from this point - it won't stay frozen.</small>
+                            </div>
+                            <div class="form-group">
+                                <button class="btn btn-primary btn-sm" onclick="saveDateTimeSettings()">
+                                    <i class="fas fa-save"></i> Save Date &amp; Time Settings
+                                </button>
+                                <button class="btn btn-outline btn-sm" onclick="clearDateTimeOverride()">
+                                    <i class="fas fa-undo"></i> Reset to Real Time
+                                </button>
+                            </div>
+                            <div class="alert alert-info mt-2">
+                                <i class="fas fa-clock"></i>
+                                App's current date &amp; time: <strong id="appCurrentDateTimeDisplay">-</strong>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-clock"></i> Time Settings</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label>Late Deduction Type</label>
+                                <div class="radio-group">
+                                    <label class="radio-label">
+                                        <input type="radio" name="lateType" value="per_minute" onchange="saveSettings()">
+                                        Per Minute
+                                    </label>
+                                    <label class="radio-label">
+                                        <input type="radio" name="lateType" value="per_range" onchange="saveSettings()">
+                                        Per Time Range
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="form-group" id="latePerMinuteGroup">
+                                <label>Late Rate (Per Minute)</label>
+                                <div class="input-with-icon">
+                                    <span class="currency-symbol">₱</span>
+                                    <input type="number" id="latePerMinute" class="form-control" placeholder="0.00" min="0" step="0.01" onchange="saveSettings()">
+                                </div>
+                                <small class="text-muted">Deduction per minute late</small>
+                            </div>
+                            <div class="form-group hidden" id="latePerRangeGroup">
+                                <label>Late Deduction Ranges (Minutes → Amount)</label>
+                                <div id="lateRangeList"></div>
+                                <button class="btn btn-sm btn-outline" onclick="addLateRange()">
+                                    <i class="fas fa-plus"></i> Add Range
+                                </button>
+                            </div>
+                            <div class="form-group">
+                                <label>OT Rate (Per Hour)</label>
+                                <div class="input-with-icon">
+                                    <span class="currency-symbol">₱</span>
+                                    <input type="number" id="otRate" class="form-control" placeholder="100.00" min="0" step="0.01">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Break Time (Minutes)</label>
+                                <input type="number" id="breakMinutes" class="form-control" placeholder="60" min="0" onchange="saveSettings()">
+                                <small class="text-muted">Fallback only, used if Time In/Time Out don't fully span the AM/PM lunch window below. Normally the lunch break is auto-deducted from the schedule - employees don't need to time in/out for lunch.</small>
+                            </div>
+                        </div>
+                    </div>
 
-                <!-- Orders Module -->
-                <section class="page-module" id="page-orders"></section>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-business-time"></i> Schedule & Attendance Rules</h3>
+                        </div>
+                        <div class="card-body">
+                            <label>Work Schedule (AM / PM)</label>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="text-muted">AM Time In</label>
+                                    <input type="time" id="scheduleAmIn" class="form-control" onchange="saveSettings()">
+                                </div>
+                                <div class="form-group">
+                                    <label class="text-muted">AM Time Out</label>
+                                    <input type="time" id="scheduleAmOut" class="form-control" onchange="saveSettings()">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="text-muted">PM Time In</label>
+                                    <input type="time" id="schedulePmIn" class="form-control" onchange="saveSettings()">
+                                </div>
+                                <div class="form-group">
+                                    <label class="text-muted">PM Time Out</label>
+                                    <input type="time" id="schedulePmOut" class="form-control" onchange="saveSettings()">
+                                </div>
+                            </div>
+                            <small class="text-muted">OT is anything worked beyond PM Time Out. Lunch (AM Out → PM In) is auto-deducted from worked hours.</small>
 
-                <!-- Reports Module -->
-                <section class="page-module" id="page-reports"></section>
+                            <label style="margin-top: 16px; display: block;">Late Rule Tiers (minutes late from AM Time In)</label>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="text-muted">Grace ends at (min)</label>
+                                    <input type="number" id="lateGraceEnd" class="form-control" min="0" onchange="saveSettings()">
+                                </div>
+                                <div class="form-group">
+                                    <label class="text-muted">Per-minute tier ends at (min)</label>
+                                    <input type="number" id="latePerMinuteEnd" class="form-control" min="0" onchange="saveSettings()">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="text-muted">1hr deduction tier ends at (min)</label>
+                                    <input type="number" id="lateFlat1hrEnd" class="form-control" min="0" onchange="saveSettings()">
+                                </div>
+                                <div class="form-group">
+                                    <label class="text-muted">2hr deduction tier ends at (min)</label>
+                                    <input type="number" id="lateFlat2hrEnd" class="form-control" min="0" onchange="saveSettings()">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="text-muted">Half-day tier ends at (min)</label>
+                                <input type="number" id="lateHalfDayEnd" class="form-control" min="0" onchange="saveSettings()">
+                                <small class="text-muted">Beyond this many minutes late, the day is marked Absent.</small>
+                            </div>
+                            <div class="form-group">
+                                <div class="checkbox-label">
+                                    <input type="checkbox" id="sundayAllOT" onchange="saveSettings()">
+                                    <span>Sunday = all hours worked at OT rate (late rules don't apply)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-                <!-- Shifts Module -->
-                <section class="page-module" id="page-shifts"></section>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-location-dot"></i> Attendance Security (Geofencing)</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="geofenceLiveStatus" class="geofence-status-banner geofence-status-off">
+                                <i class="fas fa-circle-notch fa-spin"></i> Checking live kiosk status...
+                            </div>
+                            <div class="form-group">
+                                <div class="checkbox-label">
+                                    <input type="checkbox" id="geofenceEnabled" onchange="saveSettings()">
+                                    <span>Only allow employees to time in/out from the office</span>
+                                </div>
+                                <small class="text-muted">Applies to employees scanning their own QR with their own phone. Off by default so it never blocks attendance until you set it up.</small>
+                            </div>
+                            <div class="form-group">
+                                <button type="button" class="btn btn-outline btn-sm" id="captureLocationBtn" onclick="captureOfficeLocation()">
+                                    <i class="fas fa-location-crosshairs"></i> Capture Office Location
+                                </button>
+                                <small class="text-muted" id="officeLocationAccuracy">Stand at the office (where employees will scan from), then tap this on your own phone/laptop.</small>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="text-muted">Office Latitude</label>
+                                    <input type="number" id="officeLat" class="form-control" step="0.000001" placeholder="e.g. 10.315699" onchange="saveSettings()">
+                                </div>
+                                <div class="form-group">
+                                    <label class="text-muted">Office Longitude</label>
+                                    <input type="number" id="officeLng" class="form-control" step="0.000001" placeholder="e.g. 123.885437" onchange="saveSettings()">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="text-muted">Allowed Radius (meters)</label>
+                                <input type="number" id="geofenceRadiusM" class="form-control" min="5" step="1" onchange="saveSettings()">
+                                <small class="text-muted">
+                                    Phone GPS is typically only accurate to ~10-30m outdoors and can be much worse indoors -
+                                    a 5m radius will likely reject employees standing right at the office. 30-50m is a safer
+                                    default; the app also auto-adds a small buffer based on each phone's reported GPS accuracy.
+                                </small>
+                            </div>
+                            <div class="alert alert-info mt-2">
+                                <i class="fas fa-shield-halved"></i>
+                                This check runs on the server, not just in the browser, so it can't be bypassed by editing the page.
+                                It stops casual "clock in from home" attempts, but a phone with GPS-spoofing tools enabled could
+                                still fake a location - for stronger guarantees, consider pairing this with a physical NFC tag
+                                or a QR code that only displays at the office.
+                            </div>
+                        </div>
+                    </div>
 
-                <!-- Shift Schedules Module -->
-                <section class="page-module" id="page-schedules"></section>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-money-bill"></i> Pay Settings</h3>
+                        </div>
+                        <div class="card-body">
+                                                <div class="form-group">
+                                <label>Enable Statutory Deductions</label>
+                                <div class="checkbox-label">
+                                    <input type="checkbox" id="enableStatutoryDeductions" onchange="saveSettings()">
+                                    <span>Enable SSS, PhilHealth, and Pag-IBIG deductions in payroll computation</span>
+                                </div>
+                                <small class="text-muted">When disabled, payroll will only calculate regular pay, OT pay, and late deductions</small>
+                            </div>
+                            <div class="form-group">
+                                <div class="checkbox-label">
+                                    <input type="checkbox" id="hideStatutoryOnPayslip" onchange="saveSettings()">
+                                    <span>Hide SSS, PhilHealth, and Pag-IBIG on the printed payslip</span>
+                                </div>
+                                <small class="text-muted">The deductions still happen and are reflected in the total/net pay - this only hides the itemized breakdown on the payslip employees see.</small>
+                            </div>
 
-                <!-- Payroll Module -->
-                <section class="page-module" id="page-payroll"></section>
+                            <div class="form-group">
+                                <label>Statutory Deduction Overrides (applies to all employees)</label>
+                                <small class="text-muted">Auto-compute uses the standard PH contribution tables. Fixed sets one amount for everyone. Waived means nobody gets this deduction. A specific employee's amount can still be edited for a single pay period from the Payroll tab.</small>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="text-muted">SSS</label>
+                                    <select id="sssMode" class="form-control" onchange="updateStatutoryModeVisibility(); saveSettings();">
+                                        <option value="auto">Auto-compute</option>
+                                        <option value="fixed">Fixed amount</option>
+                                        <option value="waived">Waived (₱0)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group hidden" id="sssFixedAmountGroup">
+                                    <label class="text-muted">Fixed SSS Amount</label>
+                                    <div class="input-with-icon">
+                                        <span class="currency-symbol">₱</span>
+                                        <input type="number" id="sssFixedAmount" class="form-control" placeholder="0.00" min="0" step="0.01" onchange="saveSettings()">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="text-muted">PhilHealth</label>
+                                    <select id="philhealthMode" class="form-control" onchange="updateStatutoryModeVisibility(); saveSettings();">
+                                        <option value="auto">Auto-compute</option>
+                                        <option value="fixed">Fixed amount</option>
+                                        <option value="waived">Waived (₱0)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group hidden" id="philhealthFixedAmountGroup">
+                                    <label class="text-muted">Fixed PhilHealth Amount</label>
+                                    <div class="input-with-icon">
+                                        <span class="currency-symbol">₱</span>
+                                        <input type="number" id="philhealthFixedAmount" class="form-control" placeholder="0.00" min="0" step="0.01" onchange="saveSettings()">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="text-muted">Pag-IBIG</label>
+                                    <select id="pagibigMode" class="form-control" onchange="updateStatutoryModeVisibility(); saveSettings();">
+                                        <option value="auto">Auto-compute</option>
+                                        <option value="fixed">Fixed amount</option>
+                                        <option value="waived">Waived (₱0)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group hidden" id="pagibigFixedAmountGroup">
+                                    <label class="text-muted">Fixed Pag-IBIG Amount</label>
+                                    <div class="input-with-icon">
+                                        <span class="currency-symbol">₱</span>
+                                        <input type="number" id="pagibigFixedAmount" class="form-control" placeholder="0.00" min="0" step="0.01" onchange="saveSettings()">
+                                    </div>
+                                </div>
+                            </div>
 
-                <!-- Leaderboards Module -->
-                <section class="page-module" id="page-leaderboards"></section>
+                            <div class="form-group" style="margin-top: 16px;">
+                                <label>Standard Deductions (applies to all employees, every payroll run)</label>
+                                <small class="text-muted">E.g. a company loan program, uniform fee. For a one-off deduction on a single employee for a single period (cash advance, etc.), use the "Deductions" button on that employee's row in the Payroll tab instead.</small>
+                                <div id="globalDeductionsList" class="mt-1"></div>
+                                <button class="btn btn-sm btn-outline mt-1" onclick="addGlobalDeduction()">
+                                    <i class="fas fa-plus"></i> Add Standard Deduction
+                                </button>
+                            </div>
+                            <div class="form-group">
+                                <label>Base Daily Pay (Per Day)</label>
+                                <div class="input-with-icon">
+                                    <span class="currency-symbol">₱</span>
+                                    <input type="number" id="baseDailyPay" class="form-control" placeholder="500.00" min="0" step="0.01" onchange="saveSettings()">
+                                </div>
+                                <small class="text-muted">Fixed amount per day worked</small>
+                            </div>
+                            <div class="form-group">
+                                <label>Payroll Cutoff Day</label>
+                                <select id="payrollCutoff" class="form-control" onchange="saveSettings()">
+                                    <option value="15">15th of Month</option>
+                                    <option value="30">30th of Month</option>
+                                    <option value="last">Last Working Day</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Payroll Frequency</label>
+                                <select id="payrollFrequency" class="form-control" onchange="saveSettings()">
+                                    <option value="monthly">Monthly</option>
+                                    <option value="semi_monthly">Semi-Monthly</option>
+                                    <option value="weekly">Weekly</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Pay Periods (Cutoffs &amp; Payout Dates)</label>
+                                <small class="text-muted" style="display: block; margin-bottom: 8px;">
+                                    Define each cutoff (e.g. "1st - 15th") and which day it's paid out on.
+                                    "Payout Month" lets a cutoff be paid the following month (e.g. the 16th-end
+                                    cutoff paid on the 5th of next month). These show up as choices on the
+                                    Payroll page's Pay Period dropdown.
+                                </small>
+                                <div id="payPeriodsList"></div>
+                                <button class="btn btn-sm btn-outline mt-1" onclick="addPayPeriod()">
+                                    <i class="fas fa-plus"></i> Add Pay Period
+                                </button>
+                            </div>
+                        </div>
+                    </div>
 
-                <!-- Multi-Store Reports Module -->
-                <section class="page-module" id="page-multistore"></section>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-users"></i> Employee Defaults</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label>Default Daily Rate (for new employees)</label>
+                                <div class="input-with-icon">
+                                    <span class="currency-symbol">₱</span>
+                                    <input type="number" id="defaultDailyRate" class="form-control" placeholder="400.00" min="0" step="0.01" onchange="saveSettings()">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Default Hourly Rate</label>
+                                <div class="input-with-icon">
+                                    <span class="currency-symbol">₱</span>
+                                    <input type="number" id="defaultHourlyRate" class="form-control" placeholder="50.00" min="0" step="0.01" onchange="saveSettings()">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Default Position</label>
+                                <input type="text" id="defaultPosition" class="form-control" placeholder="Employee" onchange="saveSettings()">
+                            </div>
+                        </div>
+                    </div>
 
-                <!-- Billing Module -->
-                <section class="page-module" id="page-billing"></section>
-                
-                <!-- Internet Café Module -->
-                <section class="page-module" id="page-cybercafe"></section>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-building"></i> Company Information</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label>Company Name</label>
+                                <input type="text" id="companyName" class="form-control" placeholder="Enter company name" onchange="saveCompanySettings()">
+                            </div>
+                            <div class="form-group">
+                                <label>Company Address</label>
+                                <textarea id="companyAddress" class="form-control" placeholder="Enter company address" rows="2" onchange="saveCompanySettings()"></textarea>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>TIN</label>
+                                    <input type="text" id="companyTIN" class="form-control" placeholder="000-000-000-000" onchange="saveCompanySettings()">
+                                </div>
+                                <div class="form-group">
+                                    <label>SSS Number</label>
+                                    <input type="text" id="companySSS" class="form-control" placeholder="00-0000000-0" onchange="saveCompanySettings()">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>PhilHealth Number</label>
+                                    <input type="text" id="companyPhilhealth" class="form-control" placeholder="000000000000" onchange="saveCompanySettings()">
+                                </div>
+                                <div class="form-group">
+                                    <label>Pag-IBIG Number</label>
+                                    <input type="text" id="companyPagibig" class="form-control" placeholder="0000-0000-0000" onchange="saveCompanySettings()">
+                                </div>
+                                <div class="form-group">
+                                    <button class="btn btn-success" onclick="saveCompanySettings()">
+                                        <i class="fas fa-save"></i> Save Company Settings
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-                <!-- Settings Module -->
-                <section class="page-module" id="page-settings"></section>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-database"></i> Data Management</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <button class="btn btn-primary" onclick="exportData()">
+                                    <i class="fas fa-download"></i> Export All Data
+                                </button>
+                                <button class="btn btn-outline" onclick="document.getElementById('importFile').click()">
+                                    <i class="fas fa-upload"></i> Import Data
+                                </button>
+                                <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
+                                <button class="btn btn-success" onclick="saveSettings()" style="margin-left: 10px;">
+                                    <i class="fas fa-save"></i> Save Settings
+                                </button>
+                            </div>
+                            <div class="alert alert-warning mt-2">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                Backup your data before importing. Import will replace all existing data.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports Page -->
+            <div class="page" id="page-reports">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-chart-pie"></i> Payroll Summary Report</h3>
+                        <div class="filter-box">
+                            <input type="month" id="reportMonth" class="form-control" onchange="generateReport()">
+                            <button class="btn btn-primary btn-sm" onclick="generateReport()">
+                                <i class="fas fa-file-pdf"></i> Generate
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="reportContent" class="report-container"></div>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
 
-    <!-- Modal Container -->
-    <div class="modal-backdrop" id="modalBackdrop">
-        <div class="modal" id="modalContent"></div>
-    </div>
-
-    <!-- Confirm Dialog -->
-    <div class="modal-backdrop confirm-dialog" id="confirmBackdrop">
-        <div class="modal">
+    <!-- Add Employee Modal -->
+    <div class="modal hidden" id="employeeModal">
+        <div class="modal-overlay" onclick="closeModal('employeeModal')"></div>
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3>Add Employee</h3>
+                <button class="btn-close" onclick="closeModal('employeeModal')">&times;</button>
+            </div>
             <div class="modal-body">
-                <span class="confirm-icon">⚠️</span>
-                <h3 id="confirmTitle">Are you sure?</h3>
-                <p class="confirm-text" id="confirmText">This action cannot be undone.</p>
+                <input type="hidden" id="editEmployeeId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>First Name *</label>
+                        <input type="text" id="firstName" class="form-control" placeholder="Enter first name">
+                    </div>
+                    <div class="form-group">
+                        <label>Middle Name</label>
+                        <input type="text" id="middleName" class="form-control" placeholder="Enter middle name">
+                    </div>
+                    <div class="form-group">
+                        <label>Last Name *</label>
+                        <input type="text" id="lastName" class="form-control" placeholder="Enter last name">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Position *</label>
+                        <input type="text" id="position" class="form-control" placeholder="Position">
+                    </div>
+                    <div class="form-group">
+                        <label>Department</label>
+                        <input type="text" id="department" class="form-control" placeholder="Department">
+                    </div>
+                    <div class="form-group">
+                        <label>Employee ID</label>
+                        <input type="text" id="employeeId" class="form-control" placeholder="Auto-generated">
+                        <small class="text-muted" id="employeeIdHint">Auto-generated - you can edit it before saving.</small>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="email" class="form-control" placeholder="employee@company.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Phone</label>
+                        <input type="tel" id="phone" class="form-control" placeholder="+63 9XX XXX XXXX">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Address</label>
+                    <textarea id="address" class="form-control" placeholder="Home address" rows="2"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Daily Rate (₱)</label>
+                        <input type="number" id="dailyRate" class="form-control" placeholder="0.00" min="0" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label>Hourly Rate (₱)</label>
+                        <input type="number" id="hourlyRate" class="form-control" placeholder="0.00" min="0" step="0.01">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Base Daily Pay</label>
+                        <div class="input-with-icon">
+                            <span class="currency-symbol">₱</span>
+                            <input type="number" id="baseDailyPayInput" class="form-control" placeholder="0.00" min="0" step="0.01">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Hire Date</label>
+                        <input type="date" id="hireDate" class="form-control">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>SSS Number</label>
+                        <input type="text" id="sssNumber" class="form-control" placeholder="00-0000000-0">
+                    </div>
+                    <div class="form-group">
+                        <label>PhilHealth Number</label>
+                        <input type="text" id="philhealthNumber" class="form-control" placeholder="000000000000">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Pag-IBIG Number</label>
+                        <input type="text" id="pagibigNumber" class="form-control" placeholder="0000-0000-0000">
+                    </div>
+                    <div class="form-group">
+                        <label>TIN</label>
+                        <input type="text" id="tin" class="form-control" placeholder="000-000-000-000">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="employeeStatus" class="form-control">
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="on_leave">On Leave</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Attendance Kiosk PIN</label>
+                    <input type="text" id="employeePin" class="form-control" placeholder="4-digit PIN, e.g. 1234" maxlength="4" inputmode="numeric" pattern="[0-9]{4}">
+                    <small class="text-muted" id="employeePinHint">Used when this employee scans their attendance QR code on their own phone. Leave blank to keep unchanged.</small>
+                </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-outline" id="confirmCancel">Cancel</button>
-                <button class="btn btn-danger" id="confirmOk">Delete</button>
+                <button class="btn btn-secondary" onclick="closeModal('employeeModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveEmployee()">Save Employee</button>
             </div>
         </div>
     </div>
 
-    <!-- Toast Container -->
+    <!-- Payroll Deductions Modal -->
+    <div class="modal hidden" id="payrollDeductionsModal">
+        <div class="modal-overlay" onclick="closeModal('payrollDeductionsModal')"></div>
+        <div class="modal-content" style="max-width: 640px;">
+            <div class="modal-header">
+                <h3>Edit Deductions</h3>
+                <button class="btn-close" onclick="closeModal('payrollDeductionsModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="deductionsEmployeeId">
+                <input type="hidden" id="deductionsPeriodStart">
+                <input type="hidden" id="deductionsPeriodEnd">
+                <p class="text-muted" id="deductionsEmployeeLabel" style="margin-top: -8px;"></p>
+                <div class="alert alert-info hidden" id="globalDeductionsNote" style="font-size: 13px;"></div>
+
+                <h5 class="mt-2 deductions-statutory-field">Statutory Deductions</h5>
+                <small class="text-muted deductions-statutory-field">Leave a field blank to use the auto-computed amount for this period. Enter 0 to waive it.</small>
+                <div class="form-row mt-1">
+                    <div class="form-group deductions-statutory-field">
+                        <label>SSS (₱)</label>
+                        <input type="number" id="sssOverrideInput" class="form-control" placeholder="Auto" min="0" step="0.01">
+                        <small class="text-muted" id="sssAutoHint"></small>
+                    </div>
+                    <div class="form-group deductions-statutory-field">
+                        <label>PhilHealth (₱)</label>
+                        <input type="number" id="philhealthOverrideInput" class="form-control" placeholder="Auto" min="0" step="0.01">
+                        <small class="text-muted" id="philhealthAutoHint"></small>
+                    </div>
+                    <div class="form-group deductions-statutory-field">
+                        <label>Pag-IBIG (₱)</label>
+                        <input type="number" id="pagibigOverrideInput" class="form-control" placeholder="Auto" min="0" step="0.01">
+                        <small class="text-muted" id="pagibigAutoHint"></small>
+                    </div>
+                </div>
+
+                <h5 class="mt-3">Other Deductions</h5>
+                <small class="text-muted">Cash advance, loan repayment, uniform, equipment, or anything else specific to this pay period.</small>
+                <div id="otherDeductionsList" class="mt-1"></div>
+                <button type="button" class="btn btn-outline btn-sm mt-1" onclick="addOtherDeductionRow()">
+                    <i class="fas fa-plus"></i> Add Deduction
+                </button>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('payrollDeductionsModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveDeductionsAdjustment()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DTR Add Modal -->
+    <div class="modal hidden" id="dtrModal">
+        <div class="modal-overlay" onclick="closeModal('dtrModal')"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Manual DTR Entry</h3>
+                <button class="btn-close" onclick="closeModal('dtrModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Employee *</label>
+                    <select id="dtrEmployee" class="form-control"></select>
+                </div>
+                <div class="form-group">
+                    <label>Date *</label>
+                    <input type="date" id="dtrDate" class="form-control">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Time In *</label>
+                        <input type="time" id="dtrTimeIn" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Time Out *</label>
+                        <input type="time" id="dtrTimeOut" class="form-control">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>OT Hours</label>
+                        <input type="number" id="dtrOTHours" class="form-control" placeholder="Auto: beyond PM Time Out" min="0" step="0.25">
+                        <small class="text-muted">Leave blank to auto-calculate from Time Out vs. PM Time Out below.</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Late Minutes</label>
+                        <input type="number" id="dtrLateMinutes" class="form-control" placeholder="0" min="0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="dtrStatus" class="form-control">
+                        <option value="present">Present</option>
+                        <option value="late">Late</option>
+                        <option value="absent">Absent</option>
+                        <option value="half_day">Half Day</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px; font-weight: normal;">
+                        <input type="checkbox" id="dtrHourlyOverride" style="width: auto;">
+                        Pay by actual hours worked (undertime override)
+                    </label>
+                    <small class="text-muted">
+                        Instead of a flat full/half-day rate, pay Total Hours (minus any OT hours) &times; hourly rate.
+                        Late deduction and OT are calculated exactly the same either way - use this when someone
+                        clocked in and out within a schedule window but didn't complete it (e.g. left early).
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('dtrModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveDTR()">Save Entry</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paste DTR Data Modal -->
+    <div class="modal hidden" id="bulkDtrModal">
+        <div class="modal-overlay" onclick="closeModal('bulkDtrModal')"></div>
+        <div class="modal-content paste-dtr-modal">
+            <div class="modal-header">
+                <h3>Paste DTR Data</h3>
+                <button class="btn-close" onclick="closeModal('bulkDtrModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="paste-dtr-month-row">
+                    <label for="pasteDtrMonth">Month:</label>
+                    <select id="pasteDtrMonth" class="form-control" onchange="onPasteDtrMonthChange()"></select>
+                </div>
+
+                <div class="paste-dtr-rules-hint" id="pasteDtrRulesHint"></div>
+
+                <div class="paste-dtr-tabs" id="pasteDtrTabs"></div>
+
+                <div class="table-responsive paste-dtr-table-wrap">
+                    <table class="table paste-dtr-table" id="pasteDtrTable">
+                        <thead id="pasteDtrTableHead"></thead>
+                        <tbody id="pasteDtrTableBody"></tbody>
+                    </table>
+                </div>
+
+                <datalist id="pasteDtrEmployeeList"></datalist>
+
+                <div class="paste-dtr-toolbar">
+                    <button class="btn btn-sm btn-outline" onclick="addPasteDtrEmployeeRow('')">
+                        <i class="fas fa-plus"></i> Add Employee Row
+                    </button>
+                    <button class="btn btn-sm btn-outline" onclick="clearPasteDtrGrid()">
+                        <i class="fas fa-eraser"></i> Clear Grid
+                    </button>
+                    <small class="text-muted">Tip: you can paste a whole block copied from Excel/Sheets (names down one column, In/Out times across) directly into any cell.</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('bulkDtrModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="importPasteDtrAttendance()">
+                    <i class="fas fa-file-import"></i> Import Attendance
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Code Modal -->
+    <div class="modal hidden" id="qrModal">
+        <div class="modal-overlay" onclick="closeModal('qrModal')"></div>
+        <div class="modal-content" style="max-width: 300px; margin: auto;">
+            <div class="modal-header text-center">
+                <h3>Employee QR Code</h3>
+                <button class="btn-close" onclick="closeModal('qrModal')">&times;</button>
+            </div>
+            <div class="modal-body text-center">
+                <div id="qrCodeDisplay"></div>
+                <h5 id="qrEmployeeDisplayName" class="mt-3"></h5>
+                <p class="text-muted">Scan this code to log time</p>
+                <button class="btn btn-sm btn-outline mt-2" onclick="printQRCodes()">
+                    <i class="fas fa-print"></i> Print
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <!-- Scripts -->
+    <!-- Login Modal -->
+    <div class="modal" id="loginModal">
+        <div class="modal-overlay"></div>
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header text-center">
+                <div style="width: 60px; height: 60px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+                    <i class="fas fa-building" style="font-size: 24px; color: white;"></i>
+                </div>
+                <h3 style="margin-bottom: 4px;">Welcome to ZE-Payroll</h3>
+                <p class="text-muted" style="font-size: 13px;">Please sign in to continue</p>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="loginUsername" class="form-control" placeholder="you@company.com" autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="loginPassword" class="form-control" placeholder="Enter password" autocomplete="current-password">
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="rememberMe">
+                        <span>Remember me</span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="loginSubmitBtn" style="width: 100%; justify-content: center;" onclick="handleLogin()">
+                    <i class="fas fa-sign-in-alt"></i> Sign In
+                </button>
+            </div>
+            <div style="padding: 16px 20px; border-top: 1px solid var(--gray-200); text-align: center; font-size: 12px; color: var(--gray-500);">
+                Sign in with the admin account you created in Supabase Auth.<br>
+                New here? <a href="register.html" style="color: var(--primary); font-weight: 500;">Create an account →</a><br>
+                <a href="index.html" style="color: var(--primary); font-weight: 500;">&larr; Back to ZE Payroll home</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Billing Blocked Modal (shown instead of the dashboard when a trial/subscription has lapsed) -->
+    <div class="modal hidden" id="billingBlockedModal">
+        <div class="modal-overlay"></div>
+        <div class="modal-content" style="max-width: 420px;">
+            <div class="modal-header text-center">
+                <div style="width: 60px; height: 60px; background: #f59e0b; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+                    <i class="fas fa-clock" style="font-size: 24px; color: white;"></i>
+                </div>
+                <h3 id="billingBlockedTitle" style="margin-bottom: 4px;">Your trial has ended</h3>
+                <p class="text-muted" style="font-size: 13px;" id="billingBlockedSub">Pick a plan to keep using ZE Payroll.</p>
+            </div>
+            <div class="modal-body" style="font-size: 13.5px; line-height: 1.7;">
+                <div id="billingBlockedBody"></div>
+            </div>
+            <div class="modal-footer" style="flex-direction: column; gap: 8px;">
+                <a href="index.html#pricing" class="btn btn-primary" style="width: 100%; justify-content: center;">
+                    <i class="fas fa-arrow-up"></i> View Plans
+                </a>
+                <button class="btn btn-outline" style="width: 100%; justify-content: center;" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i> Sign Out
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="config.js"></script>
-    <script src="js/db.js"></script>
-    <script src="js/supabase-client.js"></script>
-    <script src="js/auth.js"></script>
-    <script src="js/app.js"></script>
-    <script src="js/dashboard.js"></script>
-    <script src="js/staff.js"></script>
-    <script src="js/categories.js"></script>
-    <script src="js/menu.js"></script>
-    <script src="js/bundles.js"></script>
-    <script src="js/condiments.js"></script>
-    <script src="js/tax.js"></script>
-    <script src="js/stock.js"></script>
-    <script src="js/schedules.js"></script>
-    <script src="js/shifts.js"></script>
-    <script src="js/pos.js"></script>
-    <script src="js/orders.js"></script>
-    <script src="js/reports.js"></script>
-    <script src="js/recipe-cost.js"></script>
-    <script src="js/payroll.js"></script>
-    <script src="js/leaderboards.js"></script>
-    <script src="js/multistore-reports.js"></script>
-        <script src="js/cybercafe.js"></script>
-    <script src="js/billing.js"></script>
-    <script src="js/receipt.js"></script>
-    <script>
-        // Register Service Worker for PWA
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').catch(() => {});
-        }
-    </script>
+    <script src="supabase-config.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>

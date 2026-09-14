@@ -1,148 +1,247 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#6366f1">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="ZE-POS">
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
-    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <title>ZE-POS - Create Account</title>
-    <link rel="stylesheet" href="css/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Create Your Account — ZE Payroll</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+    :root{
+        --ink:#0b1020; --ink-soft:#131a30; --ink-line:rgba(255,255,255,.09);
+        --paper:#f6f7fb; --card:#ffffff;
+        --blue:#2563eb; --blue-deep:#17419e;
+        --lime:#c3ff4d; --lime-deep:#8fd400;
+        --on-dark:#eef1fb; --on-dark-dim:#9aa4c4;
+        --on-light:#0f1430; --on-light-dim:#5b6280;
+        --radius:16px; --radius-sm:10px;
+        --shadow:0 24px 60px -24px rgba(11,16,32,.45);
+        --display:'Space Grotesk', sans-serif; --body:'Manrope', sans-serif;
+    }
+    *{box-sizing:border-box; margin:0; padding:0;}
+    body{font-family:var(--body); background:var(--ink); color:var(--on-dark); min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:40px 20px;}
+    h1,h2,h3{font-family:var(--display); letter-spacing:-0.01em;}
+    a{color:inherit;}
+    .brand{display:flex; align-items:center; gap:10px; font-weight:700; font-size:18px; margin-bottom:28px;}
+    .brand span{width:32px; height:32px; border-radius:8px; background:var(--blue); display:flex; align-items:center; justify-content:center; font-family:var(--display); font-size:13px;}
+    .shell{width:100%; max-width:900px;}
+    .head{text-align:center; margin-bottom:32px;}
+    .head h1{font-size:28px; margin-bottom:8px;}
+    .head p{color:var(--on-dark-dim); font-size:14.5px;}
+
+    .layout{display:grid; grid-template-columns:1fr 1fr; gap:20px;}
+    @media (max-width:760px){.layout{grid-template-columns:1fr;}}
+
+    .plans{display:flex; flex-direction:column; gap:12px;}
+    .plan-card{
+        background:var(--ink-soft); border:2px solid var(--ink-line); border-radius:var(--radius-sm);
+        padding:16px 18px; cursor:pointer; position:relative; transition:border-color .15s ease, background .15s ease;
+    }
+    .plan-card:hover{border-color:rgba(255,255,255,.22);}
+    .plan-card.selected{border-color:var(--lime); background:rgba(195,255,77,.06);}
+    .plan-card .row{display:flex; justify-content:space-between; align-items:baseline; gap:10px;}
+    .plan-card .pname{font-weight:700; font-size:15px;}
+    .plan-card .pprice{font-family:var(--display); font-size:20px;}
+    .plan-card .pprice small{font-size:11px; font-weight:500; color:var(--on-dark-dim);}
+    .plan-card .psub{font-size:12px; color:var(--on-dark-dim); margin-top:2px;}
+    .plan-card .ptag{position:absolute; top:-9px; right:14px; background:var(--lime); color:#132000; font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px;}
+    .plan-card input{position:absolute; opacity:0; pointer-events:none;}
+
+    .payment-note{
+        margin-top:6px; background:rgba(37,99,235,.1); border:1px solid rgba(37,99,235,.3);
+        border-radius:var(--radius-sm); padding:12px 14px; font-size:12.5px; color:var(--on-dark-dim); display:none;
+    }
+    .payment-note.show{display:block;}
+    .payment-note b{color:#fff;}
+
+    .form-card{background:var(--card); color:var(--on-light); border-radius:var(--radius); padding:28px; box-shadow:var(--shadow);}
+    .form-group{margin-bottom:16px;}
+    .form-group label{display:block; font-size:12.5px; font-weight:600; margin-bottom:6px; color:var(--on-light-dim);}
+    .form-group input{
+        width:100%; padding:11px 13px; border-radius:9px; border:1px solid #dfe2ee; font-size:14px;
+        font-family:var(--body); background:#fbfbfe;
+    }
+    .form-group input:focus{outline:none; border-color:var(--blue);}
+    .btn{width:100%; padding:13px; border:none; border-radius:999px; font-weight:700; font-size:14.5px; cursor:pointer; font-family:var(--body);}
+    .btn-primary{background:var(--blue); color:#fff;}
+    .btn-primary:hover{background:var(--blue-deep);}
+    .btn-primary:disabled{opacity:.6; cursor:default;}
+    .msg{border-radius:9px; padding:11px 13px; font-size:13px; margin-bottom:16px; display:none;}
+    .msg.error{display:block; background:#fef2f2; color:#b91c1c; border:1px solid #fecaca;}
+    .msg.success{display:block; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0;}
+    .hint{text-align:center; font-size:13px; color:var(--on-dark-dim); margin-top:20px;}
+    .hint a{color:var(--lime); font-weight:600;}
+</style>
 </head>
 <body>
-    <div class="login-page">
-        <div class="login-container">
-            <div class="login-logo"><a href="index.html"><img src="assets/logo.png" alt="ZE-POS logo"></a></div>
-            <h1 class="login-title">Create Your Account</h1>
-            <p class="login-subtitle">Start your cloud POS — monthly subscription</p>
 
-            <div id="regError" class="login-error" style="display:none;">
-                Something went wrong.
+    <div class="brand"><a href="index.html" style="display:flex; align-items:center; gap:10px;"><span>ZE</span> ZE Payroll</a></div>
+
+    <div class="shell">
+        <div class="head">
+            <h1>Create your account</h1>
+            <p>Pick a plan, set your login, and your dashboard is ready in under a minute.</p>
+        </div>
+
+        <div class="layout">
+            <!-- Plan selection -->
+            <div>
+                <div class="plans" id="planList">
+                    <!-- populated from the plans table -->
+                    <div style="color:var(--on-dark-dim); font-size:13px; padding:10px 0;">Loading plans…</div>
+                </div>
+                <div class="payment-note" id="paymentNote">
+                    <b>Payment (activates within one business day):</b><br>
+                    GCash: <b>[Your GCash number]</b><br>
+                    Maya: <b>[Your Maya number]</b><br>
+                    Bank: <b>[Your bank + account number]</b><br>
+                    Send proof of payment to <b>ev.lounel4195@gmail.com</b> after signing up and we'll activate your plan.
+                </div>
             </div>
-            <div id="regSuccess" class="login-success" style="display:none;">
-                Account created! Check your email for a confirmation link, then sign in.
-            </div>
 
-            <form class="login-form" id="regForm">
-                <div class="form-group">
-                    <label for="businessName">Business Name</label>
-                    <input type="text" id="businessName" placeholder="e.g. ZE-POS" required autocomplete="organization">
-                </div>
-                <div class="form-group">
-                    <label for="regEmail">Email</label>
-                    <input type="email" id="regEmail" placeholder="you@business.com" required autocomplete="email">
-                </div>
-                <div class="form-group">
-                    <label for="regPassword">Password</label>
-                    <input type="password" id="regPassword" placeholder="At least 6 characters" required minlength="6" autocomplete="new-password">
-                </div>
-                <div class="form-group">
-                    <label for="regConfirm">Confirm Password</label>
-                    <input type="password" id="regConfirm" placeholder="Repeat password" required autocomplete="new-password">
-                </div>
-                <button type="submit" class="btn-login" id="regBtn">Create Account</button>
-            </form>
+            <!-- Registration form -->
+            <div class="form-card">
+                <div class="msg error" id="errMsg"></div>
+                <div class="msg success" id="okMsg"></div>
 
-            <div class="login-hint">
-                Already have an account? <a href="login.html"><strong>Sign in</strong></a>
+                <form id="regForm">
+                    <div class="form-group">
+                        <label for="businessName">Business Name</label>
+                        <input type="text" id="businessName" placeholder="e.g. ZE Fiber Internet Services" required autocomplete="organization">
+                    </div>
+                    <div class="form-group">
+                        <label for="regEmail">Email</label>
+                        <input type="email" id="regEmail" placeholder="you@business.com" required autocomplete="email">
+                    </div>
+                    <div class="form-group">
+                        <label for="regPassword">Password</label>
+                        <input type="password" id="regPassword" placeholder="At least 6 characters" required minlength="6" autocomplete="new-password">
+                    </div>
+                    <div class="form-group">
+                        <label for="regConfirm">Confirm Password</label>
+                        <input type="password" id="regConfirm" placeholder="Repeat password" required autocomplete="new-password">
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="regBtn">Create Account</button>
+                </form>
             </div>
         </div>
+
+        <div class="hint">Already have an account? <a href="app.html">Sign in</a></div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="config.js"></script>
-    <script src="js/db.js"></script>
-    <script src="js/supabase-client.js"></script>
-    <script src="js/auth.js"></script>
+    <script src="supabase-config.js"></script>
     <script>
-        (async function () {
-            Supabase.init();
+        const supabaseClient = (window.supabase && typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL && !SUPABASE_URL.includes('YOUR-PROJECT'))
+            ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+            : null;
 
-            // Already signed in? Go straight to the app.
-            const session = await Supabase.getSession();
-            if (session) {
+        const errMsg = document.getElementById('errMsg');
+        const okMsg = document.getElementById('okMsg');
+        const planList = document.getElementById('planList');
+        const paymentNote = document.getElementById('paymentNote');
+        let plans = [];
+        let selectedSlug = new URLSearchParams(location.search).get('plan') || 'trial';
+
+        function showError(text) {
+            errMsg.textContent = text;
+            errMsg.style.display = 'block';
+            okMsg.style.display = 'none';
+        }
+
+        function renderPlans() {
+            planList.innerHTML = plans.map(p => `
+                <label class="plan-card ${p.slug === selectedSlug ? 'selected' : ''}" data-slug="${p.slug}">
+                    ${p.slug === '6mo' ? '<div class="ptag">Best value</div>' : ''}
+                    <input type="radio" name="plan" value="${p.slug}" ${p.slug === selectedSlug ? 'checked' : ''}>
+                    <div class="row">
+                        <span class="pname">${p.name}</span>
+                        <span class="pprice">₱${Number(p.price).toLocaleString()}${p.price > 0 ? `<small> / ${p.duration_days}d</small>` : ''}</span>
+                    </div>
+                    <div class="psub">${p.features.join(' · ')}</div>
+                </label>
+            `).join('');
+
+            document.querySelectorAll('.plan-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    selectedSlug = card.getAttribute('data-slug');
+                    document.querySelectorAll('.plan-card').forEach(c => c.classList.toggle('selected', c === card));
+                    card.querySelector('input').checked = true;
+                    paymentNote.classList.toggle('show', selectedSlug !== 'trial');
+                });
+            });
+
+            paymentNote.classList.toggle('show', selectedSlug !== 'trial');
+        }
+
+        async function loadPlans() {
+            if (!supabaseClient) {
+                planList.innerHTML = '<div style="color:#f87171; font-size:13px;">Not connected to Supabase — copy your project URL/key into supabase-config.js first.</div>';
+                return;
+            }
+            const { data, error } = await supabaseClient
+                .from('plans')
+                .select('*')
+                .eq('active', true)
+                .order('sort_order');
+            if (error || !data || data.length === 0) {
+                planList.innerHTML = '<div style="color:#f87171; font-size:13px;">Could not load plans. Has the 009_saas_billing.sql migration been run yet?</div>';
+                return;
+            }
+            plans = data;
+            if (!plans.some(p => p.slug === selectedSlug)) selectedSlug = plans[0].slug;
+            renderPlans();
+        }
+
+        document.getElementById('regForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!supabaseClient) { showError('Not connected to Supabase.'); return; }
+
+            const businessName = document.getElementById('businessName').value.trim();
+            const email = document.getElementById('regEmail').value.trim();
+            const password = document.getElementById('regPassword').value;
+            const confirm = document.getElementById('regConfirm').value;
+            errMsg.style.display = 'none';
+            okMsg.style.display = 'none';
+
+            if (password !== confirm) { showError('Passwords do not match.'); return; }
+
+            const btn = document.getElementById('regBtn');
+            btn.disabled = true;
+            btn.textContent = 'Creating account…';
+
+            const { data, error } = await supabaseClient.auth.signUp({
+                email, password,
+                options: { data: { business_name: businessName, plan_slug: selectedSlug } }
+            });
+
+            btn.disabled = false;
+            btn.textContent = 'Create Account';
+
+            if (error) { showError(error.message || 'Could not create your account.'); return; }
+
+            // If email confirmation is OFF in Supabase Auth settings, signUp
+            // returns a live session immediately -> go straight to the app.
+            if (data.session) {
                 window.location.href = 'app.html';
                 return;
             }
 
-            const errorEl = document.getElementById('regError');
-            const successEl = document.getElementById('regSuccess');
-            const btn = document.getElementById('regBtn');
-            const countdownEl = document.createElement('div');
-            countdownEl.className = 'login-error';
-            countdownEl.style.display = 'none';
-            errorEl.parentNode.insertBefore(countdownEl, errorEl.nextSibling);
+            errMsg.style.display = 'none';
+            okMsg.style.display = 'block';
+            okMsg.innerHTML = selectedSlug === 'trial'
+                ? `Account created! Check <b>${email}</b> for a confirmation link, then sign in — your 5-day trial starts the moment you log in.`
+                : `Account created! Check <b>${email}</b> for a confirmation link. After confirming, send your payment proof to <b>ev.lounel4195@gmail.com</b> — we'll activate your plan within one business day.`;
+            document.getElementById('regForm').reset();
+        });
 
-            document.getElementById('regForm').addEventListener('submit', async function (e) {
-                e.preventDefault();
-                const businessName = document.getElementById('businessName').value.trim();
-                const email = document.getElementById('regEmail').value.trim();
-                const password = document.getElementById('regPassword').value;
-                const confirm = document.getElementById('regConfirm').value;
-                errorEl.style.display = 'none';
-                successEl.style.display = 'none';
-
-                if (password !== confirm) {
-                    errorEl.textContent = 'Passwords do not match.';
-                    errorEl.style.display = 'block';
-                    return;
-                }
-
-                // Check lockout (client + server)
-                const check = await Lockout.preCheck('reg', email);
-                if (check.locked) {
-                    Lockout.startCountdown(countdownEl, check.lockedUntil);
-                    return;
-                }
-
-                btn.disabled = true;
-                btn.textContent = 'Creating account…';
-                const { user, error } = await Supabase.signUp({ email, password, businessName });
-                btn.disabled = false;
-                btn.textContent = 'Create Account';
-
-                if (error) {
-                    const rec = await Lockout.record('reg', email);
-                    if (rec.locked) {
-                        Lockout.startCountdown(countdownEl, rec.lockedUntil);
-                    }
-                    errorEl.textContent = error.message || 'Could not create your account.';
-                    errorEl.style.display = 'block';
-                    return;
-                }
-
-                // Success — clear lockout on both sides
-                await Lockout.reset('reg', email);
-                countdownEl.style.display = 'none';
-
-                // If email confirmation is off, Supabase returns a session → log straight in.
-                const newSession = await Supabase.getSession();
-                if (newSession) {
-                    try {
-                        await DB.init();
-                        const { profile } = await Supabase.getProfile();
-                        await Auth.setSession(profile);
-                        window.location.href = 'app.html';
-                        return;
-                    } catch (err) {
-                        window.location.href = 'app.html';
-                        return;
-                    }
-                }
-
-                successEl.textContent = user && user.email
-                    ? `Account created! We sent a confirmation link to ${user.email}. Confirm it, then sign in.`
-                    : 'Account created! Confirm your email, then sign in.';
-                successEl.style.display = 'block';
-            });
+        (async function init() {
+            if (supabaseClient) {
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                if (session) { window.location.href = 'app.html'; return; }
+            }
+            await loadPlans();
         })();
     </script>
 </body>

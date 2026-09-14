@@ -1,97 +1,310 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#6366f1">
-    <title>ZE-POS Admin</title>
-    <link rel="stylesheet" href="css/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        body { background: var(--bg); }
-        .admin-shell { padding: 24px; max-width: 1200px; margin: 0 auto; }
-        .admin-header {
-            display: flex; align-items: center; justify-content: space-between;
-            gap: 12px; flex-wrap: wrap; margin-bottom: 20px;
-        }
-        .admin-brand { font-size: 20px; font-weight: 800; }
-        .admin-brand small { font-weight: 500; color: var(--muted); }
-        .admin-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZE Payroll — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+    :root{
+        --ink:#0b0f1c; --panel:#131a30; --line:rgba(255,255,255,.08);
+        --blue:#2563eb; --lime:#c3ff4d; --green:#22c55e; --amber:#eab308; --red:#ef4444;
+        --dim:#9aa4c4; --display:'Space Grotesk', sans-serif; --body:'Manrope', sans-serif;
+    }
+    *{box-sizing:border-box; margin:0; padding:0;}
+    body{font-family:var(--body); background:var(--ink); color:#fff; min-height:100vh;}
+    h1,h2,h3{font-family:var(--display); letter-spacing:-.01em;}
+
+    /* ---- Login gate ---- */
+    #gate{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px;}
+    .gate-card{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:32px; width:100%; max-width:360px;}
+    .gate-card h2{font-size:20px; margin-bottom:6px;}
+    .gate-card p{color:var(--dim); font-size:13px; margin-bottom:20px;}
+    .gate-card input{width:100%; padding:11px 13px; margin-bottom:12px; border-radius:9px; border:1px solid var(--line); background:#0b0f1c; color:#fff; font-size:14px;}
+    .gate-card button{width:100%; padding:12px; border:none; border-radius:999px; background:var(--blue); color:#fff; font-weight:700; cursor:pointer; font-size:14px;}
+    .gate-err{color:var(--red); font-size:13px; margin-bottom:10px; display:none;}
+
+    /* ---- Dashboard ---- */
+    #dash{display:none; max-width:1100px; margin:0 auto; padding:28px 20px 80px;}
+    .topbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:26px; flex-wrap:wrap; gap:12px;}
+    .topbar .brand{display:flex; align-items:center; gap:10px; font-weight:700; font-size:17px;}
+    .topbar .brand span{width:30px; height:30px; border-radius:8px; background:var(--blue); display:flex; align-items:center; justify-content:center; font-family:var(--display); font-size:12px;}
+    .topbar .actions{display:flex; gap:10px; align-items:center; font-size:13px; color:var(--dim);}
+    .topbar .actions a, .topbar .actions button{color:var(--dim); background:none; border:1px solid var(--line); border-radius:999px; padding:7px 14px; cursor:pointer; font-size:13px; font-family:var(--body);}
+    .topbar .actions a:hover, .topbar .actions button:hover{color:#fff; border-color:rgba(255,255,255,.25);}
+
+    .stat-row{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px;}
+    .stat{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px;}
+    .stat b{display:block; font-family:var(--display); font-size:22px;}
+    .stat span{font-size:12px; color:var(--dim);}
+
+    .panel{background:var(--panel); border:1px solid var(--line); border-radius:14px; overflow:hidden; margin-bottom:20px;}
+    .panel-head{padding:16px 18px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center;}
+    .panel-head h3{font-size:15px;}
+    table{width:100%; border-collapse:collapse; font-size:13px;}
+    th{text-align:left; padding:10px 18px; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--dim); border-bottom:1px solid var(--line);}
+    td{padding:12px 18px; border-bottom:1px solid var(--line); vertical-align:middle;}
+    tr:last-child td{border-bottom:none;}
+    .pill{font-size:10.5px; font-weight:700; padding:3px 9px; border-radius:999px; text-transform:capitalize;}
+    .pill.trial{background:rgba(37,99,235,.18); color:#60a5fa;}
+    .pill.active{background:rgba(34,197,94,.18); color:#4ade80;}
+    .pill.overdue{background:rgba(234,179,8,.18); color:#fbbf24;}
+    .pill.cancelled{background:rgba(239,68,68,.18); color:#f87171;}
+    .row-actions{display:flex; gap:6px; flex-wrap:wrap;}
+    .row-actions button{font-size:11.5px; padding:5px 10px; border-radius:7px; border:1px solid var(--line); background:transparent; color:#fff; cursor:pointer;}
+    .row-actions button:hover{border-color:rgba(255,255,255,.3);}
+    .row-actions button.primary{background:var(--blue); border-color:var(--blue);}
+    .empty{padding:30px 18px; text-align:center; color:var(--dim); font-size:13px;}
+
+    /* ---- Modal ---- */
+    .modal-bg{position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:50; padding:20px;}
+    .modal-bg.show{display:flex;}
+    .modal{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:24px; width:100%; max-width:380px;}
+    .modal h3{font-size:16px; margin-bottom:16px;}
+    .modal label{display:block; font-size:12px; color:var(--dim); margin-bottom:5px; margin-top:12px;}
+    .modal input, .modal select{width:100%; padding:9px 11px; border-radius:8px; border:1px solid var(--line); background:#0b0f1c; color:#fff; font-size:13.5px;}
+    .modal-footer{display:flex; gap:8px; margin-top:20px;}
+    .modal-footer button{flex:1; padding:10px; border-radius:8px; border:1px solid var(--line); background:transparent; color:#fff; cursor:pointer; font-size:13px;}
+    .modal-footer button.primary{background:var(--blue); border-color:var(--blue); font-weight:700;}
+</style>
 </head>
 <body>
-    <div class="admin-shell">
-        <div class="admin-header">
-            <div class="admin-brand">🛠 ZE-POS <small>Admin Dashboard</small></div>
-            <div class="admin-actions">
-                <span id="adminUser" class="text-muted"></span>
-                <button class="btn btn-outline btn-sm" id="btnNotifSettings">🔔 Notifications</button>
-                <a class="btn btn-outline btn-sm" href="app.html">Open POS</a>
-                <button class="btn btn-outline btn-sm" id="btnAdminLogout">Logout</button>
+
+    <!-- Login gate -->
+    <div id="gate">
+        <div class="gate-card">
+            <h2>Admin Sign In</h2>
+            <p>Super-admin access only.</p>
+            <div class="gate-err" id="gateErr"></div>
+            <input type="email" id="gateEmail" placeholder="Email">
+            <input type="password" id="gatePassword" placeholder="Password">
+            <button id="gateBtn">Sign In</button>
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dash">
+        <div class="topbar">
+            <div class="brand"><span>ZE</span> Admin Dashboard</div>
+            <div class="actions">
+                <span id="whoami"></span>
+                <a href="app.html">Open App</a>
+                <button id="logoutBtn">Logout</button>
             </div>
         </div>
-        <div id="adminStats" class="stats-grid"></div>
 
-        <div class="card" style="margin-top:20px;border:2px solid var(--warning, #f59e0b);" id="pendingCard">
-            <div class="card-header">
-                <h3>🔔 Pending Subscriptions <span id="pendingBadge" class="badge badge-warning" style="display:none;"></span></h3>
-                <button class="btn btn-outline btn-sm" id="btnRefreshPending">↻ Refresh</button>
-            </div>
-            <div class="card-body" style="padding:0;">
-                <div id="pendingList">
-                    <div class="empty-state"><span class="icon">⏳</span><h3>Loading…</h3></div>
-                </div>
-            </div>
-        </div>
+        <div class="stat-row" id="statRow"></div>
 
-        <div class="card" style="margin-top:20px;">
-            <div class="card-header">
+        <div class="panel">
+            <div class="panel-head">
                 <h3>Clients & Subscriptions</h3>
-                <button class="btn btn-primary btn-sm" id="btnAdminRefresh">↻ Refresh</button>
+                <button id="refreshBtn" style="background:none; border:1px solid var(--line); color:var(--dim); border-radius:8px; padding:6px 12px; cursor:pointer; font-size:12.5px;"><i class="fas fa-rotate"></i> Refresh</button>
             </div>
-            <div class="card-body" style="padding:0;">
-                <div id="clientList">
-                    <div class="empty-state"><span class="icon">⏳</span><h3>Loading clients…</h3></div>
-                </div>
-            </div>
-        </div>
-
-        <div class="card" style="margin-top:20px;">
-            <div class="card-header">
-                <h3>📦 Subscription Plans</h3>
-                <button class="btn btn-primary btn-sm" id="btnNewPlan">+ New Plan</button>
-            </div>
-            <div class="card-body" style="padding:0;">
-                <div id="planList">
-                    <div class="empty-state"><span class="icon">⏳</span><h3>Loading plans…</h3></div>
-                </div>
-            </div>
+            <div id="clientTableWrap"><div class="empty">Loading…</div></div>
         </div>
     </div>
 
-    <!-- Modal -->
-    <div class="modal-backdrop" id="adminModalBackdrop">
-        <div class="modal" id="adminModalContent"></div>
-    </div>
-
-    <!-- Confirm dialog -->
-    <div class="modal-backdrop confirm-dialog" id="adminConfirmBackdrop">
+    <!-- Record payment modal -->
+    <div class="modal-bg" id="payModalBg">
         <div class="modal">
-            <div class="modal-body">
-                <span class="confirm-icon">⚠️</span>
-                <h3 id="adminConfirmTitle">Are you sure?</h3>
-                <p class="confirm-text" id="adminConfirmText"></p>
-            </div>
+            <h3>Record Payment</h3>
+            <div id="payClientName" style="color:var(--dim); font-size:13px;"></div>
+            <label>Amount (₱)</label>
+            <input type="number" id="payAmount" step="0.01" min="0">
+            <label>Method</label>
+            <select id="payMethod">
+                <option value="gcash">GCash</option>
+                <option value="maya">Maya</option>
+                <option value="bank">Bank Transfer</option>
+                <option value="other">Other</option>
+            </select>
+            <label>Reference / note (optional)</label>
+            <input type="text" id="payReference" placeholder="e.g. GCash ref #, last 4 digits">
             <div class="modal-footer">
-                <button class="btn btn-outline" id="adminConfirmCancel">Cancel</button>
-                <button class="btn btn-danger" id="adminConfirmOk">OK</button>
+                <button id="payCancel">Cancel</button>
+                <button class="primary" id="payConfirm">Confirm Payment</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status change modal -->
+    <div class="modal-bg" id="statusModalBg">
+        <div class="modal">
+            <h3>Change Subscription Status</h3>
+            <div id="statusClientName" style="color:var(--dim); font-size:13px;"></div>
+            <label>New Status</label>
+            <select id="statusSelect">
+                <option value="trial">Trial</option>
+                <option value="active">Active</option>
+                <option value="overdue">Overdue</option>
+                <option value="cancelled">Cancelled</option>
+            </select>
+            <div class="modal-footer">
+                <button id="statusCancel">Cancel</button>
+                <button class="primary" id="statusConfirm">Save</button>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="config.js"></script>
-    <script src="js/supabase-client.js"></script>
-    <script src="js/admin.js"></script>
+    <script src="supabase-config.js"></script>
+    <script>
+        const supabaseClient = (window.supabase && typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL && !SUPABASE_URL.includes('YOUR-PROJECT'))
+            ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+            : null;
+
+        let clients = [];
+        let activePayId = null;
+        let activeStatusId = null;
+
+        function fmtDate(d) {
+            if (!d) return '—';
+            return new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
+        function showGateError(msg) {
+            const el = document.getElementById('gateErr');
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+
+        async function tryLogin() {
+            const email = document.getElementById('gateEmail').value.trim();
+            const password = document.getElementById('gatePassword').value;
+            document.getElementById('gateErr').style.display = 'none';
+
+            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) { showGateError(error.message); return; }
+            await checkAdminAccess();
+        }
+
+        async function checkAdminAccess() {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) { document.getElementById('gate').style.display = 'flex'; document.getElementById('dash').style.display = 'none'; return; }
+
+            const { data: isAdmin, error } = await supabaseClient.rpc('is_super_admin');
+            if (error || !isAdmin) {
+                showGateError('This account does not have admin access.');
+                await supabaseClient.auth.signOut();
+                return;
+            }
+
+            document.getElementById('gate').style.display = 'none';
+            document.getElementById('dash').style.display = 'block';
+            document.getElementById('whoami').textContent = session.user.email;
+            await loadClients();
+        }
+
+        async function loadClients() {
+            const { data, error } = await supabaseClient.rpc('admin_list_clients');
+            if (error) {
+                document.getElementById('clientTableWrap').innerHTML = `<div class="empty">Couldn't load clients: ${error.message}</div>`;
+                return;
+            }
+            clients = data || [];
+            renderStats();
+            renderTable();
+        }
+
+        function renderStats() {
+            const active = clients.filter(c => c.subscription_status === 'active').length;
+            const trial = clients.filter(c => c.subscription_status === 'trial').length;
+            const overdue = clients.filter(c => c.subscription_status === 'overdue').length;
+            document.getElementById('statRow').innerHTML = `
+                <div class="stat"><b>${clients.length}</b><span>Total Clients</span></div>
+                <div class="stat"><b style="color:#4ade80;">${active}</b><span>Active</span></div>
+                <div class="stat"><b style="color:#60a5fa;">${trial}</b><span>On Trial</span></div>
+                <div class="stat"><b style="color:#fbbf24;">${overdue}</b><span>Awaiting Payment</span></div>
+            `;
+        }
+
+        function renderTable() {
+            const wrap = document.getElementById('clientTableWrap');
+            if (clients.length === 0) { wrap.innerHTML = '<div class="empty">No clients have registered yet.</div>'; return; }
+
+            wrap.innerHTML = `
+                <table>
+                    <thead><tr><th>Business</th><th>Plan</th><th>Status</th><th>Period End</th><th>Signed Up</th><th>Actions</th></tr></thead>
+                    <tbody>
+                        ${clients.map(c => `
+                            <tr>
+                                <td><b>${c.business_name || '—'}</b><br><span style="color:var(--dim); font-size:11.5px;">${c.email || ''}</span></td>
+                                <td>${c.plan_name || '—'}</td>
+                                <td><span class="pill ${c.subscription_status}">${c.subscription_status}</span></td>
+                                <td>${fmtDate(c.current_period_end)}</td>
+                                <td>${fmtDate(c.created_at)}</td>
+                                <td>
+                                    <div class="row-actions">
+                                        <button class="primary" onclick="openPayModal('${c.id}')">Record Payment</button>
+                                        <button onclick="openStatusModal('${c.id}', '${c.subscription_status}')">Change Status</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        window.openPayModal = function (id) {
+            activePayId = id;
+            const c = clients.find(x => x.id === id);
+            document.getElementById('payClientName').textContent = c ? `${c.business_name} (${c.email})` : '';
+            document.getElementById('payAmount').value = c && c.plan_slug === '3mo' ? '399' : (c && c.plan_slug === '6mo' ? '599' : '');
+            document.getElementById('payReference').value = '';
+            document.getElementById('payModalBg').classList.add('show');
+        };
+
+        window.openStatusModal = function (id, currentStatus) {
+            activeStatusId = id;
+            const c = clients.find(x => x.id === id);
+            document.getElementById('statusClientName').textContent = c ? `${c.business_name} (${c.email})` : '';
+            document.getElementById('statusSelect').value = currentStatus;
+            document.getElementById('statusModalBg').classList.add('show');
+        };
+
+        document.getElementById('payCancel').addEventListener('click', () => document.getElementById('payModalBg').classList.remove('show'));
+        document.getElementById('statusCancel').addEventListener('click', () => document.getElementById('statusModalBg').classList.remove('show'));
+
+        document.getElementById('payConfirm').addEventListener('click', async () => {
+            const amount = parseFloat(document.getElementById('payAmount').value) || 0;
+            const method = document.getElementById('payMethod').value;
+            const reference = document.getElementById('payReference').value.trim() || null;
+            const { error } = await supabaseClient.rpc('admin_record_payment', {
+                p_profile: activePayId, p_amount: amount, p_method: method, p_reference: reference
+            });
+            document.getElementById('payModalBg').classList.remove('show');
+            if (error) { alert('Could not record payment: ' + error.message); return; }
+            await loadClients();
+        });
+
+        document.getElementById('statusConfirm').addEventListener('click', async () => {
+            const status = document.getElementById('statusSelect').value;
+            const { error } = await supabaseClient.rpc('admin_set_subscription_status', {
+                p_profile: activeStatusId, p_status: status
+            });
+            document.getElementById('statusModalBg').classList.remove('show');
+            if (error) { alert('Could not change status: ' + error.message); return; }
+            await loadClients();
+        });
+
+        document.getElementById('gateBtn').addEventListener('click', tryLogin);
+        document.getElementById('gatePassword').addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
+        document.getElementById('refreshBtn').addEventListener('click', loadClients);
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            await supabaseClient.auth.signOut();
+            location.reload();
+        });
+
+        (async function init() {
+            if (!supabaseClient) {
+                showGateError('Not connected to Supabase — check supabase-config.js.');
+                return;
+            }
+            await checkAdminAccess();
+        })();
+    </script>
 </body>
 </html>
