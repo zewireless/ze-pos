@@ -16,9 +16,11 @@ const Staff = (() => {
 
         // Header actions
         document.getElementById('headerActions').innerHTML = `
+            <button class="btn btn-outline" id="btnReinviteStaff">↩️ Re-invite Former Staff</button>
             <button class="btn btn-primary" id="btnAddStaff">+ Add Staff</button>
         `;
         document.getElementById('btnAddStaff').addEventListener('click', () => openForm());
+        document.getElementById('btnReinviteStaff').addEventListener('click', () => openReinviteForm());
 
         el.innerHTML = `
             <div class="card">
@@ -345,6 +347,62 @@ const Staff = (() => {
         document.getElementById('btnCopyInvite').addEventListener('click', () => {
             if (navigator.clipboard) navigator.clipboard.writeText(code);
             App.toast('Invite code copied');
+        });
+    }
+
+    function openReinviteForm() {
+        App.openModal(`
+            <div class="modal-header">
+                <h3>Re-invite Former Staff</h3>
+                <button class="modal-close" onclick="App.closeModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted" style="margin-bottom:16px;">
+                    For someone who worked here before, was deleted from the staff list,
+                    and needs to sign back in under their original email. This re-opens
+                    their existing account for joining — it does not create a new one.
+                </p>
+                <div class="form-group">
+                    <label>Their email <span class="required">*</span></label>
+                    <input type="email" class="form-control" id="reinviteEmail" placeholder="e.g. juan@gmail.com">
+                </div>
+                <p class="form-hint" style="margin:0;">
+                    After this, add them again with <strong>+ Add Staff</strong> (if you haven't
+                    already) and click <strong>🔗 Invite</strong> on their row to generate a new
+                    code. They can then sign in with their existing password and enter that code.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="btnConfirmReinvite">Re-invite</button>
+                <button class="btn btn-outline" onclick="App.closeModal()">Cancel</button>
+            </div>
+        `);
+
+        document.getElementById('reinviteEmail').focus();
+        document.getElementById('btnConfirmReinvite').addEventListener('click', async () => {
+            const btn = document.getElementById('btnConfirmReinvite');
+            const email = document.getElementById('reinviteEmail').value.trim();
+            if (!email) {
+                App.toast('Email is required', 'error');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Re-inviting...';
+
+            const client = Supabase.getClient();
+            const { error } = await client.rpc('admin_reinvite_staff', { p_email: email });
+
+            if (error) {
+                App.toast(error.message || 'Could not re-invite that account', 'error');
+                btn.disabled = false;
+                btn.textContent = 'Re-invite';
+                return;
+            }
+
+            DB.logAction('staff_reinvite', 'users', null, { email });
+            App.toast(`${email} can now sign in and enter a new invite code`);
+            App.closeModal();
         });
     }
 
