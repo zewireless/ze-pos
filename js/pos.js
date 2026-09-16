@@ -770,6 +770,25 @@ const POS = (() => {
         }, 0);
     }
 
+    // Remaining units available to sell for a tracked condiment/add-on.
+    // Returns null when stock isn't tracked (i.e. unlimited).
+    function getCondimentStockLimit(condimentId) {
+        const cond = DB.getById('condiments', condimentId);
+        if (!cond || !cond.track_stock) return null;
+        return Math.max(0, parseFloat(cond.stock_quantity) || 0);
+    }
+
+    // How many units of this condiment are already committed across the
+    // whole cart — every cart line that includes it consumes cartItem.quantity
+    // units of it (e.g. 3x burger with extra cheese uses 3 extra cheese).
+    function condimentCartQuantityFor(condimentId, excludeIdx = -1) {
+        return cart.reduce((sum, c, i) => {
+            if (i === excludeIdx) return sum;
+            const used = (c.condiments || []).some(cd => cd.id === condimentId);
+            return sum + (used ? c.quantity : 0);
+        }, 0);
+    }
+
     function productCard(item) {
         const sizes = DB.query('menu_sizes', s => s.menuItemId === item.id);
         const minPrice = sizes.length ? Math.min(...sizes.map(s => parseFloat(s.price) || 0)) : 0;
@@ -906,13 +925,17 @@ const POS = (() => {
                 ${condiments.length > 0 ? `
                     <label style="font-weight:600;margin-bottom:8px;display:block;">Add-ons</label>
                     <div class="condiment-list" id="condimentList">
-                        ${condiments.map(c => `
-                            <label class="condiment-item" data-cond-id="${c.id}" data-cond-name="${App.escapeHtml(c.name)}" data-cond-price="${c.price}">
-                                <input type="checkbox" value="${c.id}">
+                        ${condiments.map(c => {
+                            const limit = getCondimentStockLimit(c.id);
+                            const isOut = limit !== null && limit <= 0;
+                            return `
+                            <label class="condiment-item ${isOut ? 'out-of-stock' : ''}" data-cond-id="${c.id}" data-cond-name="${App.escapeHtml(c.name)}" data-cond-price="${c.price}" ${isOut ? 'title="Out of stock"' : ''}>
+                                <input type="checkbox" value="${c.id}" ${isOut ? 'disabled' : ''}>
                                 <span class="condiment-name">${App.escapeHtml(c.name)}</span>
-                                <span class="condiment-price">+${App.formatCurrency(c.price)}</span>
+                                <span class="condiment-price">${isOut ? 'Out of stock' : '+' + App.formatCurrency(c.price)}</span>
                             </label>
-                        `).join('')}
+                        `;
+                        }).join('')}
                     </div>
                 ` : ''}
 
@@ -938,11 +961,12 @@ const POS = (() => {
         // Condiment toggle
         document.querySelectorAll('.condiment-item').forEach(ci => {
             ci.addEventListener('click', (e) => {
+                const cb = ci.querySelector('input');
+                if (cb.disabled) return;
                 if (e.target.tagName !== 'INPUT') {
-                    const cb = ci.querySelector('input');
                     cb.checked = !cb.checked;
                 }
-                ci.classList.toggle('active', ci.querySelector('input').checked);
+                ci.classList.toggle('active', cb.checked);
             });
         });
 
@@ -977,6 +1001,14 @@ const POS = (() => {
             if (limit !== null && cartQuantityFor(item.id, sizeName) + 1 > limit) {
                 App.toast(limit <= 0 ? 'This item is out of stock' : `Only ${formatStockQty(limit)} ${item.unit || 'pcs'} left in stock`, 'error');
                 return;
+            }
+
+            for (const c of selectedConds) {
+                const condLimit = getCondimentStockLimit(c.id);
+                if (condLimit !== null && condimentCartQuantityFor(c.id) + 1 > condLimit) {
+                    App.toast(condLimit <= 0 ? `${c.name} is out of stock` : `Only ${formatStockQty(condLimit)} ${c.name} left in stock`, 'error');
+                    return;
+                }
             }
 
             cart.push({
@@ -1138,6 +1170,13 @@ const POS = (() => {
                         App.toast(`Only ${formatStockQty(limit)} ${DB.getById('menu_items', ci.itemId)?.unit || 'pcs'} left in stock`, 'error');
                         return;
                     }
+                    for (const c of (ci.condiments || [])) {
+                        const condLimit = getCondimentStockLimit(c.id);
+                        if (condLimit !== null && condimentCartQuantityFor(c.id, idx) + ci.quantity + delta > condLimit) {
+                            App.toast(`Only ${formatStockQty(condLimit)} ${c.name} left in stock`, 'error');
+                            return;
+                        }
+                    }
                 }
                 ci.quantity = Math.max(1, ci.quantity + delta);
                 ci.lineTotal = ci.unitPrice * ci.quantity;
@@ -1171,11 +1210,23 @@ const POS = (() => {
         // Final stock guard: catch anything that went stale since items were
         // added (e.g. someone else sold the last of it, or a manual stock
         // adjustment happened) before we commit the sale.
+        const condimentTotals = {};
         for (const ci of cart) {
             const limit = getStockLimit(ci.itemId, ci.size);
             if (limit !== null && ci.quantity > limit) {
                 const itemName = DB.getById('menu_items', ci.itemId)?.name || ci.name;
                 App.toast(`Not enough stock for ${itemName} — only ${formatStockQty(limit)} left. Adjust the quantity and try again.`, 'error');
+                return;
+            }
+            (ci.condiments || []).forEach(c => {
+                condimentTotals[c.id] = (condimentTotals[c.id] || 0) + ci.quantity;
+            });
+        }
+        for (const [condId, neededQty] of Object.entries(condimentTotals)) {
+            const condLimit = getCondimentStockLimit(condId);
+            if (condLimit !== null && neededQty > condLimit) {
+                const condName = DB.getById('condiments', condId)?.name || 'Add-on';
+                App.toast(`Not enough stock for ${condName} — only ${formatStockQty(condLimit)} left. Adjust the order and try again.`, 'error');
                 return;
             }
         }
@@ -1277,6 +1328,32 @@ const POS = (() => {
             notes: `Auto-deducted from order #${order.orderNumber}`,
             userId: user.id,
             userName: user.name,
+        });
+
+        // Deduct any tracked condiments/add-ons attached to this line, same
+        // 22oz-cup-style add-ons the item picker lets a customer choose.
+        (cartItem.condiments || []).forEach(c => {
+            const cond = DB.getById('condiments', c.id);
+            if (!cond || !cond.track_stock) return;
+
+            const condPrevQty = parseFloat(cond.stock_quantity) || 0;
+            const condNewQty = Math.max(0, condPrevQty - cartItem.quantity);
+            DB.update('condiments', c.id, { stock_quantity: condNewQty });
+
+            DB.insert('stock_movements', {
+                menuItemId: null,
+                condimentId: c.id,
+                menuSizeId: null,
+                movementType: 'sale',
+                quantityChange: -(condPrevQty - condNewQty),
+                previousQuantity: condPrevQty,
+                newQuantity: condNewQty,
+                referenceId: order.id,
+                referenceType: 'order',
+                notes: `Auto-deducted from order #${order.orderNumber}`,
+                userId: user.id,
+                userName: user.name,
+            });
         });
     }
 
@@ -1425,6 +1502,29 @@ const POS = (() => {
             return;
         }
 
+        // Same final stock guard as a normal checkout — a split bill still
+        // sells the exact same cart, just across multiple orders.
+        const condimentTotals = {};
+        for (const ci of cart) {
+            const limit = getStockLimit(ci.itemId, ci.size);
+            if (limit !== null && ci.quantity > limit) {
+                const itemName = DB.getById('menu_items', ci.itemId)?.name || ci.name;
+                App.toast(`Not enough stock for ${itemName} — only ${formatStockQty(limit)} left. Adjust the quantity and try again.`, 'error');
+                return;
+            }
+            (ci.condiments || []).forEach(c => {
+                condimentTotals[c.id] = (condimentTotals[c.id] || 0) + ci.quantity;
+            });
+        }
+        for (const [condId, neededQty] of Object.entries(condimentTotals)) {
+            const condLimit = getCondimentStockLimit(condId);
+            if (condLimit !== null && neededQty > condLimit) {
+                const condName = DB.getById('condiments', condId)?.name || 'Add-on';
+                App.toast(`Not enough stock for ${condName} — only ${formatStockQty(condLimit)} left. Adjust the order and try again.`, 'error');
+                return;
+            }
+        }
+
         const taxInfo = getActiveTax();
 
         // Create orders for each split
@@ -1466,6 +1566,10 @@ const POS = (() => {
                     lineTotal: item.lineTotal,
                 });
             });
+
+            // Deduct stock per split order, same as a normal checkout —
+            // this was previously skipped entirely for split bills.
+            assignedItems.forEach(item => deductStockForSale(item, order, user));
 
             createdOrders.push(order);
         }

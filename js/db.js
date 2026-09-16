@@ -66,7 +66,7 @@ const DB = (() => {
         },
         settings: { createdAt: 'created_at', storeId: 'store_id' },
         stock_movements: {
-            menuItemId: 'menu_item_id', menuSizeId: 'menu_size_id', movementType: 'movement_type',
+            menuItemId: 'menu_item_id', condimentId: 'condiment_id', menuSizeId: 'menu_size_id', movementType: 'movement_type',
             quantityChange: 'quantity_change', previousQuantity: 'previous_quantity', newQuantity: 'new_quantity',
             referenceId: 'reference_id', referenceType: 'reference_type', userId: 'user_id', userName: 'user_name',
             createdAt: 'created_at', storeId: 'store_id'

@@ -289,6 +289,31 @@ const Orders = (() => {
             userId: user.id,
             userName: user.name,
         });
+
+        // Restore any tracked condiments/add-ons that were deducted for this line.
+        (orderItem.condiments || []).forEach(c => {
+            const cond = DB.getById('condiments', c.id);
+            if (!cond || !cond.track_stock) return;
+
+            const condPrevQty = parseFloat(cond.stock_quantity) || 0;
+            const condNewQty = condPrevQty + orderItem.quantity;
+            DB.update('condiments', c.id, { stock_quantity: condNewQty });
+
+            DB.insert('stock_movements', {
+                menuItemId: null,
+                condimentId: c.id,
+                menuSizeId: null,
+                movementType: 'return',
+                quantityChange: condNewQty - condPrevQty,
+                previousQuantity: condPrevQty,
+                newQuantity: condNewQty,
+                referenceId: order.id,
+                referenceType: 'order',
+                notes: `Restored — order #${order.orderNumber} voided`,
+                userId: user.id,
+                userName: user.name,
+            });
+        });
     }
 
     async function deleteOrder(id) {

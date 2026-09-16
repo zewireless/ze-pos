@@ -91,28 +91,45 @@ const Stock = (() => {
 
     function getStockItems() {
         const menuItems = DB.getAll('menu_items');
+        const condiments = DB.getAll('condiments');
         const categories = DB.getAll('categories');
         const catMap = {};
         categories.forEach(c => catMap[c.id] = c.name);
 
-        return menuItems.map(item => {
+        const statusGetter = function () {
+            if (!this.track_stock) return 'untracked';
+            if (this.stock_quantity <= 0) return 'out';
+            if (this.stock_quantity <= this.low_stock_threshold) return 'low';
+            return 'ok';
+        };
+
+        const items = menuItems.map(item => {
             const sizes = DB.query('menu_sizes', s => s.menuItemId === item.id);
             const hasSizeStock = sizes.some(s => s.track_stock);
 
             return {
                 ...item,
+                kind: 'menu_item',
                 categoryName: catMap[item.categoryId] || '—',
                 sizes,
                 hasSizeStock,
-                // Determine overall status
-                get status() {
-                    if (!this.track_stock) return 'untracked';
-                    if (this.stock_quantity <= 0) return 'out';
-                    if (this.stock_quantity <= this.low_stock_threshold) return 'low';
-                    return 'ok';
-                }
+                get status() { return statusGetter.call(this); }
             };
-        }).filter(item => {
+        });
+
+        // Condiments/add-ons have no sizes and no category, but share the
+        // exact same track_stock/stock_quantity/low_stock_threshold shape,
+        // so they slot into the same list and the same status logic.
+        const condimentItems = condiments.map(c => ({
+            ...c,
+            kind: 'condiment',
+            categoryName: 'Condiment',
+            sizes: [],
+            hasSizeStock: false,
+            get status() { return statusGetter.call(this); }
+        }));
+
+        return items.concat(condimentItems).filter(item => {
             if (searchTerm && !item.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
             if (filterCategory && item.categoryId !== filterCategory) return false;
             if (filterStockStatus) {
@@ -130,14 +147,19 @@ const Stock = (() => {
         let movements = DB.getAll('stock_movements');
         const menuItems = DB.getAll('menu_items');
         const menuSizes = DB.getAll('menu_sizes');
+        const condiments = DB.getAll('condiments');
         const itemMap = {};
         menuItems.forEach(i => itemMap[i.id] = i.name);
         const sizeMap = {};
         menuSizes.forEach(s => sizeMap[s.id] = s.name);
+        const condimentMap = {};
+        condiments.forEach(c => condimentMap[c.id] = c.name);
 
         movements = movements.map(m => ({
             ...m,
-            itemName: itemMap[m.menuItemId] || 'Unknown Item',
+            itemName: m.condimentId
+                ? (condimentMap[m.condimentId] || 'Unknown Condiment')
+                : (itemMap[m.menuItemId] || 'Unknown Item'),
             sizeName: m.menuSizeId ? (sizeMap[m.menuSizeId] || 'Unknown Size') : null,
             createdAt: m.createdAt || m.created_at
         })).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -161,7 +183,7 @@ const Stock = (() => {
                 <div class="empty-state">
                     <span class="icon">📦</span>
                     <h3>No items found</h3>
-                    <p>${searchTerm || filterCategory || filterStockStatus ? 'Try adjusting your filters.' : 'Add menu items from the Menu page to start tracking stock.'}</p>
+                    <p>${searchTerm || filterCategory || filterStockStatus ? 'Try adjusting your filters.' : 'Add menu items or condiments to start tracking stock.'}</p>
                 </div>
             `;
         }
@@ -223,8 +245,8 @@ const Stock = (() => {
         }
 
         const trackStockHtml = item.track_stock
-            ? `<label class="toggle"><input type="checkbox" checked data-action="toggle-track" data-id="${item.id}"><span class="slider"></span></label>`
-            : `<label class="toggle"><input type="checkbox" data-action="toggle-track" data-id="${item.id}"><span class="slider"></span></label>`;
+            ? `<label class="toggle"><input type="checkbox" checked data-action="toggle-track" data-id="${item.id}" data-kind="${item.kind}"><span class="slider"></span></label>`
+            : `<label class="toggle"><input type="checkbox" data-action="toggle-track" data-id="${item.id}" data-kind="${item.kind}"><span class="slider"></span></label>`;
 
         const quantity = item.track_stock ? parseFloat(item.stock_quantity || 0).toFixed(3) : '—';
         const threshold = item.track_stock ? parseFloat(item.low_stock_threshold || 10).toFixed(3) : '—';
@@ -242,12 +264,12 @@ const Stock = (() => {
                 <td class="text-right">
                     <div class="btn-group" style="justify-content:flex-end;">
                         ${item.track_stock ? `
-                            <button class="btn btn-outline btn-sm" data-action="adjust" data-id="${item.id}">Adjust</button>
+                            <button class="btn btn-outline btn-sm" data-action="adjust" data-id="${item.id}" data-kind="${item.kind}">Adjust</button>
                         ` : ''}
                         ${item.hasSizeStock ? `
                             <button class="btn btn-ghost btn-sm" data-action="view-sizes" data-id="${item.id}" title="Size-level stock">📏</button>
                         ` : ''}
-                        <button class="btn btn-ghost btn-sm" data-action="delete-item" data-id="${item.id}" title="Delete item entirely (removes from menu/POS too)" style="color:var(--danger);">🗑</button>
+                        <button class="btn btn-ghost btn-sm" data-action="delete-item" data-id="${item.id}" data-kind="${item.kind}" title="Delete ${item.kind === 'condiment' ? 'condiment' : 'item'} entirely (removes from ${item.kind === 'condiment' ? 'POS add-ons' : 'menu/POS'} too)" style="color:var(--danger);">🗑</button>
                     </div>
                 </td>
             </tr>
@@ -370,13 +392,15 @@ const Stock = (() => {
         document.querySelectorAll('[data-action="toggle-track"]').forEach(chk => {
             chk.addEventListener('change', (e) => {
                 const id = e.target.dataset.id;
-                const item = DB.getById('menu_items', id);
+                const kind = e.target.dataset.kind;
+                const table = kind === 'condiment' ? 'condiments' : 'menu_items';
+                const item = DB.getById(table, id);
                 if (!item) return;
 
                 const newTrackStock = e.target.checked;
                 if (newTrackStock && !item.track_stock) {
                     // Enabling stock tracking - set defaults
-                    DB.update('menu_items', id, {
+                    DB.update(table, id, {
                         track_stock: true,
                         stock_quantity: item.stock_quantity || 0,
                         low_stock_threshold: item.low_stock_threshold || 10,
@@ -385,7 +409,7 @@ const Stock = (() => {
                     });
                     App.toast(`Stock tracking enabled for ${item.name}`);
                 } else if (!newTrackStock && item.track_stock) {
-                    DB.update('menu_items', id, { track_stock: false });
+                    DB.update(table, id, { track_stock: false });
                     App.toast(`Stock tracking disabled for ${item.name}`);
                 }
                 render();
@@ -394,21 +418,39 @@ const Stock = (() => {
 
         // Adjust stock
         document.querySelectorAll('[data-action="adjust"]').forEach(btn => {
-            btn.addEventListener('click', () => openAdjustModal(btn.dataset.id));
+            btn.addEventListener('click', () => openAdjustModal(btn.dataset.id, btn.dataset.kind));
         });
 
-        // View size-level stock
+        // View size-level stock (menu items only — condiments have no sizes)
         document.querySelectorAll('[data-action="view-sizes"]').forEach(btn => {
             btn.addEventListener('click', () => openSizeStockModal(btn.dataset.id));
         });
 
-        // Delete item entirely (menu item + its sizes + its stock movement history)
+        // Delete item entirely (+ its sizes if any + its stock movement history)
         document.querySelectorAll('[data-action="delete-item"]').forEach(btn => {
-            btn.addEventListener('click', () => deleteStockItem(btn.dataset.id));
+            btn.addEventListener('click', () => deleteStockItem(btn.dataset.id, btn.dataset.kind));
         });
     }
 
-    async function deleteStockItem(id) {
+    async function deleteStockItem(id, kind) {
+        if (kind === 'condiment') {
+            const item = DB.getById('condiments', id);
+            if (!item) return;
+            const yes = await App.confirm(
+                'Delete Condiment?',
+                `This permanently removes "${item.name}" from your condiments and POS, along with all of its stock movement history. This can't be undone.`
+            );
+            if (!yes) return;
+
+            DB.remove('condiments', id);
+            DB.logAction('condiment_delete', 'condiments', id, { name: item.name });
+            DB.query('stock_movements', m => m.condimentId === id).forEach(m => DB.remove('stock_movements', m.id));
+
+            App.toast(`${item.name} deleted`);
+            render();
+            return;
+        }
+
         const item = DB.getById('menu_items', id);
         if (!item) return;
         const yes = await App.confirm(
@@ -450,11 +492,13 @@ const Stock = (() => {
         document.getElementById('btnExportMovements').addEventListener('click', () => exportMovementsCSV());
     }
 
-    function openAdjustModal(itemId) {
-        const item = DB.getById('menu_items', itemId);
+    function openAdjustModal(itemId, kind) {
+        kind = kind || 'menu_item';
+        const table = kind === 'condiment' ? 'condiments' : 'menu_items';
+        const item = DB.getById(table, itemId);
         if (!item) return;
 
-        const sizes = DB.query('menu_sizes', s => s.menuItemId === itemId).filter(s => s.track_stock);
+        const sizes = kind === 'condiment' ? [] : DB.query('menu_sizes', s => s.menuItemId === itemId).filter(s => s.track_stock);
 
         App.openModal(`
             <div class="modal-header">
@@ -525,7 +569,8 @@ const Stock = (() => {
             }
 
             const user = Auth.currentUser();
-            let menuItemId = itemId;
+            let menuItemId = kind === 'condiment' ? null : itemId;
+            let condimentId = kind === 'condiment' ? itemId : null;
             let menuSizeId = null;
             let currentQty = parseFloat(item.stock_quantity || 0);
             let newQty = currentQty + qty;
@@ -541,12 +586,13 @@ const Stock = (() => {
                 DB.update('menu_sizes', menuSizeId, { stock_quantity: newQty });
             } else {
                 if (newQty < 0) { App.toast('Cannot reduce stock below zero', 'error'); return; }
-                DB.update('menu_items', itemId, { stock_quantity: newQty });
+                DB.update(table, itemId, { stock_quantity: newQty });
             }
 
             // Record movement
             DB.insert('stock_movements', {
                 menuItemId,
+                condimentId,
                 menuSizeId,
                 movementType: type,
                 quantityChange: qty,
@@ -664,7 +710,7 @@ const Stock = (() => {
                                     <td class="text-right">${parseFloat(item.stock_quantity || 0).toFixed(3)} ${App.escapeHtml(item.unit || 'pcs')}</td>
                                     <td class="text-right">${parseFloat(item.low_stock_threshold || 10).toFixed(3)}</td>
                                     <td class="text-right">
-                                        <input type="number" class="form-control form-control-sm bulk-restock-input" data-id="${item.id}" step="0.001" min="0" placeholder="0" style="width:100px;">
+                                        <input type="number" class="form-control form-control-sm bulk-restock-input" data-id="${item.id}" data-kind="${item.kind}" step="0.001" min="0" placeholder="0" style="width:100px;">
                                     </td>
                                 </tr>
                             `).join('')}
@@ -686,13 +732,16 @@ const Stock = (() => {
                 const qty = parseFloat(input.value);
                 if (!isNaN(qty) && qty > 0) {
                     const itemId = input.dataset.id;
-                    const item = DB.getById('menu_items', itemId);
+                    const kind = input.dataset.kind;
+                    const table = kind === 'condiment' ? 'condiments' : 'menu_items';
+                    const item = DB.getById(table, itemId);
                     if (item) {
                         const currentQty = parseFloat(item.stock_quantity || 0);
                         const newQty = currentQty + qty;
-                        DB.update('menu_items', itemId, { stock_quantity: newQty });
+                        DB.update(table, itemId, { stock_quantity: newQty });
                         DB.insert('stock_movements', {
-                            menuItemId: itemId,
+                            menuItemId: kind === 'condiment' ? null : itemId,
+                            condimentId: kind === 'condiment' ? itemId : null,
                             menuSizeId: null,
                             movementType: 'restock',
                             quantityChange: qty,
@@ -721,14 +770,12 @@ const Stock = (() => {
 
     function exportStockCSV() {
         const items = getStockItems();
-        const categories = DB.getAll('categories');
-        const catMap = {};
-        categories.forEach(c => catMap[c.id] = c.name);
 
-        const headers = ['Item Name', 'Category', 'Track Stock', 'Current Quantity', 'Low Stock Threshold', 'Unit', 'Cost Price', 'Status'];
+        const headers = ['Type', 'Item Name', 'Category', 'Track Stock', 'Current Quantity', 'Low Stock Threshold', 'Unit', 'Cost Price', 'Status'];
         const rows = items.map(item => [
+            item.kind === 'condiment' ? 'Condiment' : 'Menu Item',
             `"${item.name.replace(/"/g, '""')}"`,
-            `"${(catMap[item.categoryId] || '').replace(/"/g, '""')}"`,
+            `"${(item.categoryName || '').replace(/"/g, '""')}"`,
             item.track_stock ? 'Yes' : 'No',
             parseFloat(item.stock_quantity || 0).toFixed(3),
             parseFloat(item.low_stock_threshold || 10).toFixed(3),
