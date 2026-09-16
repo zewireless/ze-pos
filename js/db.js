@@ -30,7 +30,7 @@ const DB = (() => {
     // bare '*' against `users` always 403s (42501) even though the column
     // grant covers everything the app actually needs. Every hydration of the
     // `users` table must use this explicit list instead of '*'.
-    const USERS_SAFE_COLUMNS = 'workspace_id,store_id,id,username,name,role,enabled,pay_type,hourly_rate,fixed_salary,created_at,auth_uid';
+    const USERS_SAFE_COLUMNS = 'workspace_id,store_id,id,username,name,role,enabled,pay_type,hourly_rate,fixed_salary,manager_pin,created_at,auth_uid';
 
     function selectColsFor(table) {
         return table === 'users' ? USERS_SAFE_COLUMNS : '*';
@@ -38,7 +38,7 @@ const DB = (() => {
 
     // camelCase (app) → snake_case (column). Keys absent here pass through unchanged.
     const FIELD_MAP = {
-        users: { authUid: 'auth_uid', payType: 'pay_type', hourlyRate: 'hourly_rate', fixedSalary: 'fixed_salary', createdAt: 'created_at', storeId: 'store_id' },
+        users: { authUid: 'auth_uid', payType: 'pay_type', hourlyRate: 'hourly_rate', fixedSalary: 'fixed_salary', managerPin: 'manager_pin', createdAt: 'created_at', storeId: 'store_id' },
         categories: { createdAt: 'created_at', storeId: 'store_id' },
         menu_items: { categoryId: 'category_id', createdAt: 'created_at', storeId: 'store_id' },
         menu_sizes: { menuItemId: 'menu_item_id', createdAt: 'created_at', storeId: 'store_id' },
@@ -673,6 +673,7 @@ async function refreshAssignedStores() {
         replaceMenuSizesInStores,
 
         logAction,
+        flushOutbox: processOutbox,
 
         getAll,
         getById,
