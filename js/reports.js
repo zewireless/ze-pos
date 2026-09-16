@@ -15,6 +15,10 @@ const Reports = (() => {
     let filterDateTo = '';
     let filterCashier = '';
 
+    // Condiment report state
+    let condimentRows = [];
+    let loadingCondiments = false;
+
     // Pagination state (reset whenever filters change)
     const PAGE = 100;
     let loadedOrders = [];
@@ -38,6 +42,175 @@ const Reports = (() => {
         shiftsHasMore = false;
     }
 
+    async function queryCondiments() {
+        loadingCondiments = true;
+        condimentRows = [];
+        const client = Supabase.getClient();
+        try {
+            const { data, error } = await client.rpc('report_condiments', {
+                p_from:     filterDateFrom ? `${filterDateFrom}T00:00:00` : null,
+                p_to:       filterDateTo   ? `${filterDateTo}T23:59:59`   : null,
+                p_store_id: null,
+            });
+            if (!error && data) condimentRows = data;
+            else console.warn('report_condiments:', error && error.message);
+        } catch (e) {
+            console.warn('report_condiments:', e.message);
+        }
+        loadingCondiments = false;
+    }
+
+    function renderCondimentsReport(el) {
+        const totalUsed   = condimentRows.reduce((s, r) => s + parseInt(r.times_added || 0), 0);
+        const totalRev    = condimentRows.reduce((s, r) => s + parseFloat(r.revenue || 0), 0);
+        const uniqueCount = condimentRows.length;
+
+        el.innerHTML = `
+            <div class="card">
+                <div class="card-header">
+                    <h3>Condiment / Add-on Usage</h3>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline" id="rptDaily">Daily</button>
+                            <button class="btn btn-sm btn-outline" id="rptMonthly">Monthly</button>
+                            <button class="btn btn-sm btn-outline" id="rptCustom">Custom Range</button>
+                            <button class="btn btn-sm btn-primary"  id="rptCondiments">Condiments</button>
+                        </div>
+                        <input type="date" class="form-control" id="rptDateFrom" value="${filterDateFrom}" style="width:150px;">
+                        <span class="text-muted">to</span>
+                        <input type="date" class="form-control" id="rptDateTo"   value="${filterDateTo}"   style="width:150px;">
+                        <button class="btn btn-primary btn-sm" id="rptApply">Apply</button>
+                        <button class="btn btn-outline btn-sm" id="btnExportCondCsv">⬇ Export CSV</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="report-summary">
+                        <div class="stat-card">
+                            <div class="stat-icon green">🧂</div>
+                            <div class="stat-info">
+                                <div class="stat-label">Total Add-ons Used</div>
+                                <div class="stat-value">${totalUsed.toLocaleString()}</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon blue">📋</div>
+                            <div class="stat-info">
+                                <div class="stat-label">Unique Condiments</div>
+                                <div class="stat-value">${uniqueCount}</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon purple">💵</div>
+                            <div class="stat-info">
+                                <div class="stat-label">Add-on Revenue</div>
+                                <div class="stat-value">${App.formatCurrency(totalRev)}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    ${condimentRows.length === 0
+                        ? `<div class="empty-state"><span class="icon">🧂</span><h3>No condiment data for this period</h3><p>Try a different date range.</p></div>`
+                        : `<div class="table-container" style="margin-top:16px;">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Condiment / Add-on</th>
+                                        <th style="text-align:right;">Times Added</th>
+                                        <th style="text-align:right;">Revenue</th>
+                                        <th style="text-align:right;">% of Usage</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${condimentRows.map(r => {
+                                        const pct = totalUsed > 0 ? ((parseInt(r.times_added) / totalUsed) * 100).toFixed(1) : '0.0';
+                                        const isFree = parseFloat(r.revenue || 0) === 0;
+                                        return `
+                                        <tr>
+                                            <td>
+                                                <strong>${App.escapeHtml(r.condiment_name || '(unnamed)')}</strong>
+                                                ${isFree ? '<span class="badge badge-info" style="margin-left:6px;font-size:0.7rem;">free</span>' : ''}
+                                            </td>
+                                            <td style="text-align:right;"><strong>${parseInt(r.times_added).toLocaleString()}</strong></td>
+                                            <td style="text-align:right;">${App.formatCurrency(parseFloat(r.revenue || 0))}</td>
+                                            <td style="text-align:right;">
+                                                <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;">
+                                                    <div style="width:80px;height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
+                                                        <div style="width:${pct}%;height:100%;background:var(--primary);border-radius:3px;"></div>
+                                                    </div>
+                                                    <span>${pct}%</span>
+                                                </div>
+                                            </td>
+                                        </tr>`;
+                                    }).join('')}
+                                </tbody>
+                                <tfoot>
+                                    <tr style="background:var(--bg);font-weight:700;">
+                                        <td>Total</td>
+                                        <td style="text-align:right;">${totalUsed.toLocaleString()}</td>
+                                        <td style="text-align:right;">${App.formatCurrency(totalRev)}</td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                           </div>`
+                    }
+                </div>
+            </div>
+        `;
+
+        // rebind tab buttons
+        document.getElementById('rptDaily').addEventListener('click', () => {
+            reportType = 'daily';
+            const t = new Date().toISOString().split('T')[0];
+            filterDateFrom = t; filterDateTo = t;
+            render();
+        });
+        document.getElementById('rptMonthly').addEventListener('click', () => {
+            reportType = 'monthly';
+            const d = new Date();
+            filterDateFrom = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+            filterDateTo = new Date().toISOString().split('T')[0];
+            render();
+        });
+        document.getElementById('rptCustom').addEventListener('click', () => {
+            reportType = 'custom'; render();
+        });
+        document.getElementById('rptCondiments').addEventListener('click', () => {
+            reportType = 'condiments'; render();
+        });
+        document.getElementById('rptApply').addEventListener('click', async () => {
+            filterDateFrom = document.getElementById('rptDateFrom').value;
+            filterDateTo   = document.getElementById('rptDateTo').value;
+            await queryCondiments();
+            renderCondimentsReport(el);
+        });
+        document.getElementById('btnExportCondCsv').addEventListener('click', () => exportCondimentsCsv());
+    }
+
+    function exportCondimentsCsv() {
+        const escape = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+        const totalUsed = condimentRows.reduce((s, r) => s + parseInt(r.times_added || 0), 0);
+        const totalRev  = condimentRows.reduce((s, r) => s + parseFloat(r.revenue || 0), 0);
+        const lines = [
+            ['Condiment / Add-on', 'Times Added', 'Revenue', '% of Usage'],
+            ...condimentRows.map(r => {
+                const pct = totalUsed > 0 ? ((parseInt(r.times_added) / totalUsed) * 100).toFixed(1) : '0.0';
+                return [escape(r.condiment_name || '(unnamed)'), r.times_added, parseFloat(r.revenue || 0).toFixed(2), `${pct}%`];
+            }),
+            ['TOTALS', totalUsed, totalRev.toFixed(2), '100%'],
+        ];
+        const csv  = lines.map(l => l.join(',')).join('\r\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href = url;
+        a.download = `condiments-${filterDateFrom || 'all'}-${filterDateTo || 'all'}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    }
+
     async function render() {
         const el = document.getElementById('page-reports');
         if (!el) return;
@@ -52,6 +225,13 @@ const Reports = (() => {
                 filterDateFrom = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
                 filterDateTo = today;
             }
+        }
+
+        // Condiments tab: fully separate render path
+        if (reportType === 'condiments') {
+            await queryCondiments();
+            renderCondimentsReport(el);
+            return;
         }
 
         // First paint: shell + loading skeleton. Data loads progressively.
@@ -114,6 +294,7 @@ const Reports = (() => {
                             <button class="btn btn-sm ${reportType === 'daily' ? 'btn-primary' : 'btn-outline'}" id="rptDaily">Daily</button>
                             <button class="btn btn-sm ${reportType === 'monthly' ? 'btn-primary' : 'btn-outline'}" id="rptMonthly">Monthly</button>
                             <button class="btn btn-sm ${reportType === 'custom' ? 'btn-primary' : 'btn-outline'}" id="rptCustom">Custom Range</button>
+                            <button class="btn btn-sm ${reportType === 'condiments' ? 'btn-primary' : 'btn-outline'}" id="rptCondiments">Condiments</button>
                         </div>
                         ${Auth.isAdmin() ? `
                             <select class="form-control" id="rptCashier" style="width:180px;">
@@ -323,6 +504,12 @@ const Reports = (() => {
             render();
         });
         if (custom) custom.addEventListener('click', () => { reportType = 'custom'; });
+
+        const condiments = document.getElementById('rptCondiments');
+        if (condiments) condiments.addEventListener('click', () => {
+            reportType = 'condiments';
+            render();
+        });
 
         if (apply) apply.addEventListener('click', () => {
             filterDateFrom = document.getElementById('rptDateFrom').value;
