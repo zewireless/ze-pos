@@ -10,7 +10,7 @@
  * BUMP CACHE_NAME on every deploy. Static assets are served cache-first, so without a
  * bump clients keep running the previous release.
  */
-const CACHE_NAME = 'ze-pos-v21'; 
+const CACHE_NAME = 'ze-pos-v22'; 
 const STATIC_ASSETS = [
     './',
     './index.html',
