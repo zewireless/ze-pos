@@ -363,6 +363,7 @@ const Orders = (() => {
                             <th>Subtotal</th>
                             <th>Tax</th>
                             <th>Total</th>
+                            <th>Payment</th>
                             <th>Cashier</th>
                             <th>Date</th>
                             <th style="text-align:right;">Actions</th>
@@ -381,6 +382,10 @@ const Orders = (() => {
                                     <td>${App.formatCurrency(o.subtotal)}</td>
                                     <td>${App.formatCurrency(o.taxAmount)}</td>
                                     <td><strong>${App.formatCurrency(o.total)}</strong></td>
+                                    <td class="text-muted">
+                                        ${o.payment_method === 'cash' ? 'Cash' : o.payment_method === 'gcash' ? 'Gcash' : '—'}
+                                        ${o.payment_method === 'gcash' && o.payment_reference ? ' ('+App.escapeHtml(o.payment_reference)+')' : ''}
+                                    </td>
                                     <td class="text-muted">${App.escapeHtml(o.userName || '—')}</td>
                                     <td class="text-muted">${App.formatDateTime(o.createdAt)}</td>
                                     <td class="text-right">

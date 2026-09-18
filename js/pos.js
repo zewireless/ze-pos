@@ -1237,6 +1237,77 @@ const POS = (() => {
         const taxAmount = taxInfo.enabled ? subtotal * taxInfo.percentage / 100 : 0;
         const total = subtotal + taxAmount;
 
+        // Show payment method modal
+        showPaymentMethodModal(subtotal, total);
+    }
+
+    // Show payment method modal
+    function showPaymentMethodModal(amountDue, totalAmount) {
+        // Store amounts for later use
+        window.paymentAmountDue = amountDue;
+        window.paymentTotalAmount = totalAmount;
+
+        const modalHTML = `
+            <div class="modal-backdrop" id="paymentBackdrop">
+                <div class="modal" style="max-width: 480px;">
+                    <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);">
+                        <h3 style="margin:0;">Payment Method</h3>
+                        <button class="modal-close" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:var(--text-muted);" onclick="App.closeModal()">✕</button>
+                    </div>
+                    <div class="modal-body" style="padding:20px;">
+                        <div class="form-group" style="margin-bottom:16px;">
+                            <label>Select Payment Method</label>
+                            <div style="display:flex;gap:12px;">
+                                <label class="btn btn-outline payment-method-btn active" data-method="cash">
+                                    <input type="radio" name="paymentMethod" value="cash" checked style="display:none;"> Cash
+                                </label>
+                                <label class="btn btn-outline payment-method-btn" data-method="gcash">
+                                    <input type="radio" name="paymentMethod" value="gcash" style="display:none;"> Gcash
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Cash Specific Fields -->
+                        <div id="cashFields" style="display:block;">
+                            <div class="form-group" style="margin-bottom:16px;">
+                                <label>Amount Tendered (₱)</label>
+                                <input type="number" class="form-control" id="cashAmount" min="0" step="0.01" placeholder="Enter amount received" data-amount-due="${amountDue}">
+                            </div>
+                            <div class="form-group" style="margin-bottom:16px;">
+                                <label>Change Due (₱)</label>
+                                <input type="text" class="form-control" id="changeDue" readonly style="background:#f8fafc;">
+                            </div>
+                        </div>
+
+                        <!-- Gcash Specific Fields -->
+                        <div id="gcashFields" style="display:none;">
+                            <div class="form-group" style="margin-bottom:16px;">
+                                <label>Gcash Reference Number</label>
+                                <input type="text" class="form-control" id="gcashReference" placeholder="Enter Gcash reference number">
+                                <small class="text-muted">This will be recorded in the order history for tracking</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:16px 20px;border-top:1px solid var(--border);">
+                        <button class="btn btn-outline" id="paymentCancel">Cancel</button>
+                        <button class="btn btn-primary" id="paymentConfirm">Confirm Payment</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        App.openModal(modalHTML);
+    }
+
+    // Complete order with payment information
+    function completeOrderWithPayment(paymentInfo) {
+        const user = Auth.currentUser();
+        const orderNumber = DB.nextOrderNumber();
+        const subtotal = window.paymentAmountDue;
+        const taxInfo = getActiveTax();
+        const taxAmount = taxInfo.enabled ? subtotal * taxInfo.percentage / 100 : 0;
+        const total = window.paymentTotalAmount;
+
         // Create order
         const openShift = Shifts.getOpenShift(user.id);
         const order = DB.insert('orders', {
@@ -1251,6 +1322,8 @@ const POS = (() => {
             userId: user.id,
             userName: user.name,
             shiftId: openShift ? openShift.id : null,
+            payment_method: paymentInfo.method,
+            payment_reference: paymentInfo.reference,
         });
 
         // Create order items
@@ -1284,7 +1357,13 @@ const POS = (() => {
         // Full re-render (not just updateCart) so the product grid picks up
         // the freshly deducted stock numbers / out-of-stock states.
         render();
-        App.toast(`Order #${orderNumber} completed!`);
+
+        // Show appropriate message based on payment method
+        if (paymentInfo.method === 'cash') {
+            App.toast(`Order #${orderNumber} completed! Change due: ${formatCurrency(paymentInfo.changeDue)}`, 'success');
+        } else {
+            App.toast(`Order #${orderNumber} completed via Gcash! Reference: ${paymentInfo.reference}`, 'success');
+        }
     }
 
     // Deducts a cart line's quantity from stock (size-level takes priority

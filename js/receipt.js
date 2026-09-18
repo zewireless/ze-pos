@@ -53,6 +53,12 @@ const Receipt = (() => {
         <div class="row"><span>Date:</span><span>${formatDateShort(order.createdAt)}</span></div>
         <div class="row"><span>Cashier:</span><span>${escapeHtml(order.userName || '—')}</span></div>
         <div class="row"><span>Order Type:</span><span>${escapeHtml(order.type)}</span></div>
+        ${order.payment_method ? `
+        <div class="row"><span>Payment Method:</span><span>${escapeHtml(order.payment_method === 'cash' ? 'Cash' : 'Gcash')}</span></div>
+        ${order.payment_reference ? `
+        <div class="row"><span>Payment Reference:</span><span>${escapeHtml(order.payment_reference)}</span></div>
+        ` : ''}
+        ` : ''}
         <hr class="divider">
 
         ${items.map(item => `

@@ -96,6 +96,7 @@ const Dashboard = (() => {
                             <th>Order #</th>
                             <th>Type</th>
                             <th>Total</th>
+                            <th>Payment</th>
                             <th>Status</th>
                             <th>Date</th>
                         </tr>
@@ -106,6 +107,10 @@ const Dashboard = (() => {
                                 <td><strong>#${o.orderNumber}</strong></td>
                                 <td><span class="badge badge-info">${App.escapeHtml(o.type)}</span></td>
                                 <td><strong>${App.formatCurrency(o.total)}</strong></td>
+                                <td class="text-muted">
+                                    ${o.payment_method === 'cash' ? 'Cash' : o.payment_method === 'gcash' ? 'Gcash' : '—'}
+                                    ${o.payment_method === 'gcash' && o.payment_reference ? ' ('+App.escapeHtml(o.payment_reference)+')' : ''}
+                                </td>
                                 <td><span class="badge ${o.status === 'Voided' ? 'badge-danger' : 'badge-success'}">${App.escapeHtml(o.status)}</span></td>
                                 <td class="text-muted">${App.formatDateTime(o.createdAt)}</td>
                             </tr>

@@ -70,10 +70,124 @@ const App = (() => {
         const content = $('#modalContent');
         content.innerHTML = html;
         backdrop.classList.add('show');
+
+        // Add event listeners for payment method modal if it's the payment modal
+        if (html.includes('paymentBackdrop')) {
+            setupPaymentModalListeners();
+        }
     }
 
     function closeModal() {
         $('#modalBackdrop').classList.remove('show');
+    }
+
+    // Payment Method Modal Handlers
+    function setupPaymentModalListeners() {
+        // Payment method selection
+        document.querySelectorAll('.payment-method-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                // Remove active class from all buttons
+                document.querySelectorAll('.payment-method-btn').forEach(b => {
+                    b.classList.remove('active');
+                });
+                // Add active class to clicked button
+                this.classList.add('active');
+
+                // Update radio button
+                const method = this.dataset.method;
+                document.querySelector(`input[name="paymentMethod"][value="${method}"]`).checked = true;
+
+                // Show/hide appropriate fields
+                if (method === 'cash') {
+                    document.getElementById('cashFields').style.display = 'block';
+                    document.getElementById('gcashFields').style.display = 'none';
+                    // Focus on cash amount input
+                    document.getElementById('cashAmount').focus();
+                } else {
+                    document.getElementById('cashFields').style.display = 'none';
+                    document.getElementById('gcashFields').style.display = 'block';
+                    // Focus on reference input
+                    document.getElementById('gcashReference').focus();
+                }
+            });
+        });
+
+        // Calculate change when cash amount is entered
+        document.getElementById('cashAmount').addEventListener('input', function() {
+            const amountDue = parseFloat(document.getElementById('cashAmount').dataset.amountDue || '0');
+            const amountTendered = parseFloat(this.value) || 0;
+            const changeDue = amountTendered - amountDue;
+            document.getElementById('changeDue').value = changeDue >= 0 ? formatCurrency(changeDue) : '';
+            // Change due field styling based on validity
+            const changeDueInput = document.getElementById('changeDue');
+            if (changeDue < 0) {
+                changeDueInput.style.borderColor = 'var(--danger)';
+                changeDueInput.style.color = 'var(--danger)';
+            } else {
+                changeDueInput.style.borderColor = '';
+                changeDueInput.style.color = '';
+            }
+        });
+
+        // Cancel button
+        document.getElementById('paymentCancel').addEventListener('click', function() {
+            closeModal();
+        });
+
+        // Confirm button
+        document.getElementById('paymentConfirm').addEventListener('click', function() {
+            const method = document.querySelector('input[name="paymentMethod"]:checked').value;
+
+            if (method === 'cash') {
+                const amountTendered = parseFloat(document.getElementById('cashAmount').value) || 0;
+                const amountDue = parseFloat(document.getElementById('cashAmount').dataset.amountDue || '0');
+                const changeDue = amountTendered - amountDue;
+
+                if (changeDue < 0) {
+                    App.toast('Amount tendered is less than the total due', 'error');
+                    return;
+                }
+
+                // Store payment info for order completion
+                window.paymentInfo = {
+                    method: 'cash',
+                    reference: amountTendered.toString(), // Store amount tendered as reference for cash
+                    changeDue: changeDue
+                };
+            } else {
+                const reference = document.getElementById('gcashReference').value.trim();
+                if (!reference) {
+                    App.toast('Please enter a Gcash reference number', 'error');
+                    return;
+                }
+
+                // Store payment info for order completion
+                window.paymentInfo = {
+                    method: 'gcash',
+                    reference: reference,
+                    changeDue: 0
+                };
+            }
+
+            closeModal();
+            // Now complete the order with payment info
+            POS.completeOrderWithPayment(window.paymentInfo);
+        });
+
+        // Close modal when clicking outside content
+        document.getElementById('modalBackdrop').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+
+        // Close modal with ESC key
+        document.addEventListener('keydown', function handleEscapeKey(e) {
+            if (e.key === 'Escape') {
+                closeModal();
+                document.removeEventListener('keydown', handleEscapeKey);
+            }
+        });
     }
 
     // ── Subscription ───────────────────────────────────────────
