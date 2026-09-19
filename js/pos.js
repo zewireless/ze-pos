@@ -1248,8 +1248,7 @@ const POS = (() => {
         window.paymentTotalAmount = totalAmount;
 
         const modalHTML = `
-            <div class="modal-backdrop" id="paymentBackdrop">
-                <div class="modal" style="max-width: 480px;">
+            <div id="paymentModal" data-modal="payment">
                     <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);">
                         <h3 style="margin:0;">Payment Method</h3>
                         <button class="modal-close" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:var(--text-muted);" onclick="App.closeModal()">✕</button>
@@ -1292,7 +1291,6 @@ const POS = (() => {
                         <button class="btn btn-outline" id="paymentCancel">Cancel</button>
                         <button class="btn btn-primary" id="paymentConfirm">Confirm Payment</button>
                     </div>
-                </div>
             </div>
         `;
 
@@ -1975,6 +1973,7 @@ const POS = (() => {
 
     return {
         render,
+        completeOrderWithPayment,
         destroyKeyboardShortcuts,
         initKeyboardShortcuts
     };

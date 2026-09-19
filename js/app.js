@@ -72,7 +72,7 @@ const App = (() => {
         backdrop.classList.add('show');
 
         // Add event listeners for payment method modal if it's the payment modal
-        if (html.includes('paymentBackdrop')) {
+        if (html.includes('data-modal="payment"')) {
             setupPaymentModalListeners();
         }
     }
