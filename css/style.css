@@ -64,6 +64,8 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 /* ── Login Page ─────────────────────────────────────────────── */
 .login-page {
     min-height: 100vh;
+    min-height: calc(var(--vh, 1vh) * 100);
+    min-height: 100dvh;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -178,6 +180,8 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 .app-layout {
     display: flex;
     min-height: 100vh;
+    min-height: calc(var(--vh, 1vh) * 100);
+    min-height: 100dvh;
 }
 
 /* ── Sidebar ────────────────────────────────────────────────── */
@@ -340,8 +344,11 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 /* ── Main Content ───────────────────────────────────────────── */
 .main-content {
     flex: 1;
+    min-width: 0;
     margin-left: var(--sidebar-width);
     min-height: 100vh;
+    min-height: calc(var(--vh, 1vh) * 100);
+    min-height: 100dvh;
     display: flex;
     flex-direction: column;
 }
@@ -723,10 +730,14 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 .pos-layout {
     display: flex;
     height: calc(100vh - var(--header-height));
+    height: calc((var(--vh, 1vh) * 100) - var(--header-height));
+    height: calc(100dvh - var(--header-height));
     overflow: hidden;
 }
 .pos-products {
     flex: 1;
+    min-width: 0;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -1020,6 +1031,7 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 /* ── POS Cart Panel ─────────────────────────────────────────── */
 .pos-cart {
     width: 380px;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     background: var(--card);
@@ -1406,6 +1418,8 @@ textarea.form-control { resize: vertical; min-height: 80px; }
     display: flex;
     flex-direction: column;
     height: 100vh;
+    height: calc(var(--vh, 1vh) * 100);
+    height: 100dvh;
     background: var(--bg);
     color: var(--text);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -2079,6 +2093,8 @@ textarea.form-control { resize: vertical; min-height: 80px; }
     padding: 48px 24px;
     gap: 12px;
     min-height: calc(100vh - var(--header-height) - 120px);
+    min-height: calc((var(--vh, 1vh) * 100) - var(--header-height) - 120px);
+    min-height: calc(100dvh - var(--header-height) - 120px);
 }
 .pos-lock-icon {
     font-size: 3.5rem;
