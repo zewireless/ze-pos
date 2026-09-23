@@ -101,6 +101,8 @@ const Shifts = (() => {
                             <th>Status</th>
                             <th>Orders</th>
                             <th>Total Sales</th>
+                            <th>Expenses</th>
+                            <th>Net Sales</th>
                             <th>Cash Float</th>
                             <th>Difference</th>
                             <th style="text-align:right;">Actions</th>
@@ -123,6 +125,8 @@ const Shifts = (() => {
                                     </td>
                                     <td>${s.orderCount != null ? s.orderCount : '—'}</td>
                                     <td><strong>${s.totalSales != null ? App.formatCurrency(s.totalSales) : '—'}</strong></td>
+                                    <td>${s.status === 'closed' ? App.formatCurrency(s.totalExpenses || 0) : '—'}</td>
+                                    <td><strong>${s.status === 'closed' ? App.formatCurrency(s.netSales != null ? s.netSales : s.totalSales) : '—'}</strong></td>
                                     <td>${App.formatCurrency(s.startingCash || 0)}</td>
                                     <td class="${diffClass}">
                                         ${s.cashDifference !== null && s.cashDifference !== undefined
@@ -295,6 +299,22 @@ const Shifts = (() => {
                             </div>
                         </div>
                     </div>
+                    ${shift.status === 'closed' ? `
+                        <div class="stat-card">
+                            <div class="stat-icon orange">🧾</div>
+                            <div class="stat-info">
+                                <div class="stat-label">Expenses</div>
+                                <div class="stat-value">${App.formatCurrency(shift.totalExpenses || 0)}</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon green">✅</div>
+                            <div class="stat-info">
+                                <div class="stat-label">Net Sales</div>
+                                <div class="stat-value">${App.formatCurrency(shift.netSales != null ? shift.netSales : totalSales)}</div>
+                            </div>
+                        </div>
+                    ` : ''}
                     <div class="stat-card">
                         <div class="stat-icon orange">🕐</div>
                         <div class="stat-info">
@@ -356,6 +376,34 @@ const Shifts = (() => {
                     </div>
                 `}
 
+                ${(shift.expenses && shift.expenses.length > 0) ? `
+                    <h4 style="margin:20px 0 12px;">Expenses This Shift</h4>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Description</th>
+                                    <th>Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${shift.expenses.map(exp => `
+                                    <tr>
+                                        <td>${App.escapeHtml(exp.description || 'Expense')}</td>
+                                        <td><strong>${App.formatCurrency(exp.amount)}</strong></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                            <tfoot>
+                                <tr style="background:var(--bg);font-weight:700;">
+                                    <td>Total Expenses</td>
+                                    <td>${App.formatCurrency(shift.totalExpenses || 0)}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                ` : ''}
+
                 ${(shift.notes || shift.handover_notes) ? `
                     <hr style="margin:20px 0;border-color:var(--border);">
                     ${shift.notes ? `
@@ -414,6 +462,20 @@ const Shifts = (() => {
         const orders = DB.query('orders', o => o.shiftId === shiftId);
         const totalSales = orders.reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
 
+        let expenseRowId = 0;
+        const expenseRow = (description = '', amount = '') => {
+            const rowId = expenseRowId++;
+            return `
+                <div class="expense-row" data-row-id="${rowId}" style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
+                    <input type="text" class="form-control expense-desc" placeholder="What was it for? (optional)"
+                           value="${App.escapeHtml(description)}" style="flex:1;">
+                    <input type="number" class="form-control expense-amount" placeholder="0.00" step="0.01" min="0"
+                           value="${amount}" style="width:120px;">
+                    <button type="button" class="btn btn-outline btn-sm btn-remove-expense" title="Remove">✕</button>
+                </div>
+            `;
+        };
+
         App.openModal(`
             <div class="modal-header">
                 <h3>End Shift</h3>
@@ -454,6 +516,32 @@ const Shifts = (() => {
                            placeholder="Enter the counted cash amount">
                     <small class="form-hint">Optional — skip if you don't want to reconcile cash.</small>
                 </div>
+
+                <hr style="margin:20px 0;border-color:var(--border);">
+
+                <div class="form-group">
+                    <label>Expenses Made During This Shift <span class="text-muted">(cash paid out — supplies, refunds, etc.)</span></label>
+                    <div id="expenseRowsContainer">
+                        ${expenseRow()}
+                    </div>
+                    <button type="button" class="btn btn-outline btn-sm" id="btnAddExpense">+ Add Expense</button>
+                </div>
+
+                <div class="card" style="padding:12px;margin-top:12px;background:var(--bg);">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                        <span class="text-muted">Total Sales</span>
+                        <strong>${App.formatCurrency(totalSales)}</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                        <span class="text-muted">Total Expenses</span>
+                        <strong id="expenseTotalPreview" style="color:var(--danger,#ef4444);">− ${App.formatCurrency(0)}</strong>
+                    </div>
+                    <hr style="margin:8px 0;border-color:var(--border);">
+                    <div style="display:flex;justify-content:space-between;font-size:1.05rem;">
+                        <span><strong>Net Sales</strong></span>
+                        <strong id="netSalesPreview">${App.formatCurrency(totalSales)}</strong>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline" onclick="App.closeModal()">Cancel</button>
@@ -461,11 +549,47 @@ const Shifts = (() => {
             </div>
         `);
 
+        const container = document.getElementById('expenseRowsContainer');
+
+        function readExpenses() {
+            return Array.from(container.querySelectorAll('.expense-row')).map(row => ({
+                description: row.querySelector('.expense-desc').value.trim(),
+                amount: parseFloat(row.querySelector('.expense-amount').value) || 0,
+            })).filter(e => e.amount > 0);
+        }
+
+        function updatePreview() {
+            const expenses = readExpenses();
+            const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+            const netSales = Math.round((totalSales - totalExpenses) * 100) / 100;
+            document.getElementById('expenseTotalPreview').textContent = `− ${App.formatCurrency(totalExpenses)}`;
+            document.getElementById('netSalesPreview').textContent = App.formatCurrency(netSales);
+        }
+
+        container.addEventListener('input', updatePreview);
+        container.addEventListener('click', (e) => {
+            if (e.target.closest('.btn-remove-expense')) {
+                const rows = container.querySelectorAll('.expense-row');
+                // Always keep at least one (empty) row visible
+                if (rows.length > 1) {
+                    e.target.closest('.expense-row').remove();
+                } else {
+                    e.target.closest('.expense-row').querySelectorAll('input').forEach(i => i.value = '');
+                }
+                updatePreview();
+            }
+        });
+
+        document.getElementById('btnAddExpense').addEventListener('click', () => {
+            container.insertAdjacentHTML('beforeend', expenseRow());
+        });
+
         document.getElementById('btnConfirmEndShift').addEventListener('click', () => {
             const endingCashVal = document.getElementById('endingCashInput').value;
             const endingCash = endingCashVal !== '' ? parseFloat(endingCashVal) : null;
+            const expenses = readExpenses();
 
-            endShift(shiftId, endingCash);
+            endShift(shiftId, endingCash, null, null, expenses);
             App.closeModal();
             render();
         });
@@ -516,7 +640,7 @@ const Shifts = (() => {
         return { ok: true, shift };
     }
 
-    function endShift(shiftId, endingCash, notes, handoverNotes) {
+    function endShift(shiftId, endingCash, notes, handoverNotes, expenses) {
         const shift = DB.getById('shifts', shiftId);
         if (!shift || shift.status !== 'open') return null;
 
@@ -527,6 +651,15 @@ const Shifts = (() => {
             ? Math.round((endingCash - (shift.startingCash || 0) - totalSales) * 100) / 100
             : null;
 
+        // Expenses are optional (e.g. admin editing notes later shouldn't wipe them out)
+        const cleanExpenses = Array.isArray(expenses)
+            ? expenses
+                .map(e => ({ description: (e.description || '').trim(), amount: Math.round((parseFloat(e.amount) || 0) * 100) / 100 }))
+                .filter(e => e.amount > 0)
+            : (shift.expenses || []);
+        const totalExpenses = Math.round(cleanExpenses.reduce((s, e) => s + e.amount, 0) * 100) / 100;
+        const netSales = Math.round((totalSales - totalExpenses) * 100) / 100;
+
         return DB.update('shifts', shiftId, {
             status: 'closed',
             endTime: new Date().toISOString(),
@@ -534,6 +667,9 @@ const Shifts = (() => {
             totalSales,
             orderCount,
             cashDifference,
+            expenses: cleanExpenses,
+            totalExpenses,
+            netSales,
             notes: notes || shift.notes,
             handover_notes: handoverNotes || shift.handover_notes,
         });

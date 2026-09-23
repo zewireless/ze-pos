@@ -165,6 +165,17 @@ const Receipt = (() => {
         <div class="row"><span>Cash Diff:</span><span>${shift.cashDifference != null ? formatCurrency(shift.cashDifference) : '—'}</span></div>
         <hr class="divider">
         <div class="row bold" style="color:${accentColor};"><span>Total Sales:</span><span>${formatCurrency(shift.totalSales != null ? shift.totalSales : totalSales)}</span></div>
+        ${shift.status === 'closed' && shift.expenses && shift.expenses.length ? `
+            <hr class="divider">
+            ${shift.expenses.map(exp => `
+                <div class="row"><span>Exp: ${escapeHtml(exp.description || 'Expense')}</span><span>-${formatCurrency(exp.amount)}</span></div>
+            `).join('')}
+            <div class="row"><span>Total Expenses:</span><span>-${formatCurrency(shift.totalExpenses || 0)}</span></div>
+        ` : ''}
+        ${shift.status === 'closed' ? `
+            <hr class="divider">
+            <div class="row bold" style="color:${accentColor};"><span>Net Sales:</span><span>${formatCurrency(shift.netSales != null ? shift.netSales : totalSales)}</span></div>
+        ` : ''}
         ${orders.length ? `
             <hr class="divider">
             ${orders.map(o => `

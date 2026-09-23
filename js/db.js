@@ -54,7 +54,8 @@ const DB = (() => {
             userId: 'user_id', userName: 'user_name', startTime: 'start_time', endTime: 'end_time',
             startingCash: 'starting_cash', endingCash: 'ending_cash', cashDifference: 'cash_difference',
             totalSales: 'total_sales', orderCount: 'order_count', scheduleId: 'schedule_id',
-            payRate: 'pay_rate', createdAt: 'created_at', storeId: 'store_id'
+            payRate: 'pay_rate', totalExpenses: 'total_expenses', netSales: 'net_sales',
+            createdAt: 'created_at', storeId: 'store_id'
         },
         shift_schedules: {
             userId: 'user_id', dayOfWeek: 'day_of_week', startTime: 'start_time', endTime: 'end_time',

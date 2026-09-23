@@ -633,6 +633,18 @@ const POS = (() => {
         const allBreaks = Shifts.getShiftBreaks(openShift.id).filter(b => b.userId === user.id);
         const totalBreakMins = allBreaks.reduce((sum, b) => sum + (b.durationMinutes || 0), 0);
 
+        let expenseRowId = 0;
+        const expenseRow = () => {
+            const rowId = expenseRowId++;
+            return `
+                <div class="expense-row" data-row-id="${rowId}" style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
+                    <input type="text" class="form-control expense-desc" placeholder="What was it for? (optional)" style="flex:1;">
+                    <input type="number" class="form-control expense-amount" placeholder="0.00" step="0.01" min="0" style="width:110px;">
+                    <button type="button" class="btn btn-outline btn-sm btn-remove-expense" title="Remove">✕</button>
+                </div>
+            `;
+        };
+
         App.openModal(`
             <div class="modal-header">
                 <h3>End Shift</h3>
@@ -672,6 +684,33 @@ const POS = (() => {
                            placeholder="Enter the counted cash amount">
                     <small class="form-hint">Optional — skip if you don't want to reconcile cash.</small>
                 </div>
+
+                <hr style="margin:20px 0;border-color:var(--border);">
+
+                <div class="form-group">
+                    <label>Expenses Made During This Shift <span class="text-muted">(cash paid out — supplies, refunds, etc.)</span></label>
+                    <div id="posExpenseRowsContainer">
+                        ${expenseRow()}
+                    </div>
+                    <button type="button" class="btn btn-outline btn-sm" id="btnAddPosExpense">+ Add Expense</button>
+                </div>
+
+                <div class="card" style="padding:12px;margin:12px 0;background:var(--bg);">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                        <span class="text-muted">Total Sales</span>
+                        <strong>${App.formatCurrency(totalSales)}</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                        <span class="text-muted">Total Expenses</span>
+                        <strong id="posExpenseTotalPreview" style="color:var(--danger,#ef4444);">− ${App.formatCurrency(0)}</strong>
+                    </div>
+                    <hr style="margin:8px 0;border-color:var(--border);">
+                    <div style="display:flex;justify-content:space-between;font-size:1.05rem;">
+                        <span><strong>Net Sales</strong></span>
+                        <strong id="posNetSalesPreview">${App.formatCurrency(totalSales)}</strong>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label>Shift Notes (for your records)</label>
                     <textarea class="form-control" id="posShiftNotes" rows="2" placeholder="Any notes about this shift...">${App.escapeHtml(openShift.notes || '')}</textarea>
@@ -692,18 +731,53 @@ const POS = (() => {
             </div>
         `);
 
+        const expContainer = document.getElementById('posExpenseRowsContainer');
+
+        function readExpenses() {
+            return Array.from(expContainer.querySelectorAll('.expense-row')).map(row => ({
+                description: row.querySelector('.expense-desc').value.trim(),
+                amount: parseFloat(row.querySelector('.expense-amount').value) || 0,
+            })).filter(e => e.amount > 0);
+        }
+
+        function updateExpensePreview() {
+            const expenses = readExpenses();
+            const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+            const netSales = Math.round((totalSales - totalExpenses) * 100) / 100;
+            document.getElementById('posExpenseTotalPreview').textContent = `− ${App.formatCurrency(totalExpenses)}`;
+            document.getElementById('posNetSalesPreview').textContent = App.formatCurrency(netSales);
+        }
+
+        expContainer.addEventListener('input', updateExpensePreview);
+        expContainer.addEventListener('click', (e) => {
+            if (e.target.closest('.btn-remove-expense')) {
+                const rows = expContainer.querySelectorAll('.expense-row');
+                if (rows.length > 1) {
+                    e.target.closest('.expense-row').remove();
+                } else {
+                    e.target.closest('.expense-row').querySelectorAll('input').forEach(i => i.value = '');
+                }
+                updateExpensePreview();
+            }
+        });
+
+        document.getElementById('btnAddPosExpense').addEventListener('click', () => {
+            expContainer.insertAdjacentHTML('beforeend', expenseRow());
+        });
+
         document.getElementById('btnConfirmPosEndShift').addEventListener('click', () => {
             const endingCashVal = document.getElementById('posEndingCashInput').value;
             const endingCash = endingCashVal !== '' ? parseFloat(endingCashVal) : null;
             const notes = document.getElementById('posShiftNotes')?.value || '';
             const handoverNotes = document.getElementById('posHandoverNotes')?.value || '';
+            const expenses = readExpenses();
 
             // End any active break first
             if (activeBreak) {
                 Shifts.endBreak(activeBreak.id);
             }
 
-            Shifts.endShift(openShift.id, endingCash, notes, handoverNotes);
+            Shifts.endShift(openShift.id, endingCash, notes, handoverNotes, expenses);
             App.closeModal();
             App.toast('Shift ended');
             render();
