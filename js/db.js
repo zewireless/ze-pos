@@ -49,7 +49,7 @@ const DB = (() => {
             taxAmount: 'tax_amount', userId: 'user_id', userName: 'user_name',
             shiftId: 'shift_id', createdAt: 'created_at', storeId: 'store_id'
         },
-        order_items: { orderId: 'order_id', menuItemId: 'menu_item_id', unitPrice: 'unit_price', lineTotal: 'line_total', storeId: 'store_id' },
+        order_items: { orderId: 'order_id', menuItemId: 'menu_item_id', unitPrice: 'unit_price', lineTotal: 'line_total', createdAt: 'created_at', storeId: 'store_id' },
         shifts: {
             userId: 'user_id', userName: 'user_name', startTime: 'start_time', endTime: 'end_time',
             startingCash: 'starting_cash', endingCash: 'ending_cash', cashDifference: 'cash_difference',
